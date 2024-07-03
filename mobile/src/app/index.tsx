@@ -1,20 +1,9 @@
-import { StyleSheet, Text, View } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
+import { Button, YStack } from 'tamagui';
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text>{t('Hello world!')}</Text>
-      <StatusBar style="auto" />
-    </View>
+    <YStack flex={1} justifyContent="center" alignItems="center">
+      <Button>{t('Hello world!')}</Button>
+    </YStack>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
