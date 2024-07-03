@@ -25,6 +25,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
+    "@ianvs/prettier-plugin-sort-imports": "^4.3.0",
     "@types/babel__core": "^7.20.5",
     "@types/react": "~18.2.79",
     "prettier": "^3.3.2",
@@ -39,6 +40,16 @@
           "parser": "json-stringify"
         }
       }
+    ],
+    "plugins": [
+      "@ianvs/prettier-plugin-sort-imports"
+    ],
+    "importOrder": [
+      "^react$",
+      "^react-native$",
+      "<THIRD_PARTY_MODULES>",
+      "",
+      "^[./]"
     ]
   },
   "private": true
