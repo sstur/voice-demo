@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "expo start",
     "typecheck": "tsc --noEmit",
-    "test": "npm run typecheck"
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run typecheck && npm run format:check"
   },
   "dependencies": {
     "@expo/metro-runtime": "~3.2.1",
@@ -25,7 +27,19 @@
     "@babel/core": "^7.20.0",
     "@types/babel__core": "^7.20.5",
     "@types/react": "~18.2.79",
+    "prettier": "^3.3.2",
     "typescript": "4.9.5"
+  },
+  "prettier": {
+    "singleQuote": true,
+    "overrides": [
+      {
+        "files": "app.json",
+        "options": {
+          "parser": "json-stringify"
+        }
+      }
+    ]
   },
   "private": true
 }
