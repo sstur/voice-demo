@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { FontProvider } from './FontProvider';
+import { LocalStorageProvider } from './LocalStorageProvider';
 import { ThemeProvider } from './ThemeProvider';
 
 type Props = {
@@ -11,8 +12,12 @@ type Props = {
 export function AppProvider(props: Props) {
   const { onInitialized, children } = props;
   return (
-    <FontProvider onInitialized={onInitialized}>
-      <ThemeProvider>{children}</ThemeProvider>
+    <FontProvider>
+      <ThemeProvider>
+        <LocalStorageProvider onInitialized={onInitialized}>
+          {children}
+        </LocalStorageProvider>
+      </ThemeProvider>
     </FontProvider>
   );
 }
