@@ -20,6 +20,9 @@ dependencies:
   '@tamagui/font-inter':
     specifier: ^1.101.7
     version: 1.101.7(react@18.2.0)
+  '@tamagui/lucide-icons':
+    specifier: ^1.101.7
+    version: 1.101.7(react-native-svg@15.2.0)(react@18.2.0)
   expo:
     specifier: ~51.0.17
     version: 51.0.17(@babel/core@7.24.7)(@babel/preset-env@7.24.7)
@@ -3508,6 +3511,17 @@ packages:
       - immer
     dev: false
 
+  /@tamagui/helpers-icon@1.101.7(react-native-svg@15.2.0)(react@18.2.0):
+    resolution: {integrity: sha512-K4se0Z/O4Kp+9MCO55PjVWQbrzJ1etgCHgriyApqUxywEGf2AQvFGudWI4pRYXjyflOAyntlBzm2sAwe2gzIag==}
+    peerDependencies:
+      react: '*'
+      react-native-svg: '>=12'
+    dependencies:
+      '@tamagui/core': 1.101.7(react@18.2.0)
+      react: 18.2.0
+      react-native-svg: 15.2.0(react-native@0.74.2)(react@18.2.0)
+    dev: false
+
   /@tamagui/helpers-tamagui@1.101.7(react@18.2.0):
     resolution: {integrity: sha512-Tbefr6wSzTiFAeW7L6OelSOJNZJQ7lDq13eflC+bRjbkI8Dh406hInyujfrthMw7CU+dbFnUmrh/R3wFnyP5lQ==}
     peerDependencies:
@@ -3579,6 +3593,18 @@ packages:
       '@tamagui/text': 1.101.7(react@18.2.0)
       '@tamagui/web': 1.101.7(react@18.2.0)
       react: 18.2.0
+    dev: false
+
+  /@tamagui/lucide-icons@1.101.7(react-native-svg@15.2.0)(react@18.2.0):
+    resolution: {integrity: sha512-Ov0KSKXd0niATlThALqNriTb5PKNrsOstdklhfAXLpEo902YYe+oYpdi8cx1J2AzqRIQQ3i7HqpUKmdVbrRlRw==}
+    peerDependencies:
+      react: '*'
+      react-native-svg: '>=12'
+    dependencies:
+      '@tamagui/core': 1.101.7(react@18.2.0)
+      '@tamagui/helpers-icon': 1.101.7(react-native-svg@15.2.0)(react@18.2.0)
+      react: 18.2.0
+      react-native-svg: 15.2.0(react-native@0.74.2)(react@18.2.0)
     dev: false
 
   /@tamagui/normalize-css-color@1.101.7:
