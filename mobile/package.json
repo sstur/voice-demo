@@ -5,9 +5,10 @@
   "scripts": {
     "dev": "expo start",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint --max-warnings 0 .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "npm run typecheck && npm run format:check"
+    "test": "npm run typecheck && npm run lint && npm run format:check"
   },
   "dependencies": {
     "@expo/metro-runtime": "~3.2.1",
@@ -28,6 +29,14 @@
     "@ianvs/prettier-plugin-sort-imports": "^4.3.0",
     "@types/babel__core": "^7.20.5",
     "@types/react": "~18.2.79",
+    "@typescript-eslint/eslint-plugin": "^7.15.0",
+    "@typescript-eslint/parser": "^7.15.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-eslint-comments": "^3.2.0",
+    "eslint-plugin-functions": "^0.0.7",
+    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-react": "^7.34.3",
+    "eslint-plugin-react-hooks": "^4.6.2",
     "prettier": "^3.3.2",
     "typescript": "4.9.5"
   },
