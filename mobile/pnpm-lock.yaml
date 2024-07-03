@@ -8,6 +8,9 @@ dependencies:
   '@expo/metro-runtime':
     specifier: ~3.2.1
     version: 3.2.1(react-native@0.74.2)
+  '@intl/t':
+    specifier: ^1.1.0
+    version: 1.1.0
   expo:
     specifier: ~51.0.17
     version: 51.0.17(@babel/core@7.24.7)(@babel/preset-env@7.24.7)
@@ -79,6 +82,9 @@ devDependencies:
   eslint-plugin-react-hooks:
     specifier: ^4.6.2
     version: 4.6.2(eslint@8.57.0)
+  eslint-plugin-t:
+    specifier: ^1.7.1
+    version: 1.7.1
   prettier:
     specifier: ^3.3.2
     version: 3.3.2
@@ -2125,6 +2131,10 @@ packages:
     transitivePeerDependencies:
       - supports-color
     dev: true
+
+  /@intl/t@1.1.0:
+    resolution: {integrity: sha512-YTI4HdmiIbF5W+uV40bzgXdNT6bY4ElEswlN0z/2rWWVI2GLs4MuBzLHmdDxY/23ENgKUUA0QnfLnXjXOhjxAQ==}
+    dev: false
 
   /@isaacs/cliui@8.0.2:
     resolution: {integrity: sha512-O8jcjabXaleOG9DQ0+ARXWZBTfnP4WNAqzuiJK7ll44AmxGKv/J2M4TPjxjY3znBCfvBXFzucm1twdyFybFqEA==}
@@ -4551,6 +4561,10 @@ packages:
       resolve: 2.0.0-next.5
       semver: 6.3.1
       string.prototype.matchall: 4.0.11
+    dev: true
+
+  /eslint-plugin-t@1.7.1:
+    resolution: {integrity: sha512-u8zCvM7DKLvQNIqN8dw/Tansh8c/vunoy8C0A5NRm1UxlpLTHcv9BzjV2XZVbC+l/SvKTGfO68g7Ryyw5RvDYw==}
     dev: true
 
   /eslint-scope@7.2.2:

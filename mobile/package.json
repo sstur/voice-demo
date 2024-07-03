@@ -1,7 +1,7 @@
 {
   "name": "rn-demo",
   "version": "0.0.0",
-  "main": "expo-router/entry",
+  "main": "src/index.ts",
   "scripts": {
     "dev": "expo start",
     "clean": "rm -rf ./.expo ./dist",
@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@expo/metro-runtime": "~3.2.1",
+    "@intl/t": "^1.1.0",
     "expo": "~51.0.17",
     "expo-constants": "~16.0.2",
     "expo-linking": "~6.3.1",
@@ -38,6 +39,7 @@
     "eslint-plugin-import": "^2.29.1",
     "eslint-plugin-react": "^7.34.3",
     "eslint-plugin-react-hooks": "^4.6.2",
+    "eslint-plugin-t": "^1.7.1",
     "prettier": "^3.3.2",
     "typescript": "4.9.5"
   },
