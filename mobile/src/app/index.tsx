@@ -1,9 +1,9 @@
-import { Button, YStack } from 'tamagui';
+import { Button, VStack } from '../components/core';
 
 export default function App() {
   return (
-    <YStack flex={1} justifyContent="center" alignItems="center">
+    <VStack flex={1} justifyContent="center" alignItems="center">
       <Button>{t('Hello world!')}</Button>
-    </YStack>
+    </VStack>
   );
 }
