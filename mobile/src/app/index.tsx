@@ -1,11 +1,19 @@
-import { Home } from '@tamagui/lucide-icons';
+import { Stack } from 'expo-router';
 
-import { Button, VStack } from '../components/core';
+import { Text, VStack } from '../components/core';
 
-export default function App() {
+export default function Page() {
   return (
-    <VStack flex={1} justifyContent="center" alignItems="center">
-      <Button icon={<Home />}>{t('Hello world!')}</Button>
-    </VStack>
+    <>
+      <Stack.Screen
+        options={{
+          title: t('Home'),
+          headerShown: false,
+        }}
+      />
+      <VStack flex={1} justifyContent="center" alignItems="center">
+        <Text>{t('Hello World')}</Text>
+      </VStack>
+    </>
   );
 }

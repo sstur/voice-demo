@@ -1,7 +1,9 @@
+import 'dotenv/config';
+
 import { createServer } from 'http';
 import { Readable } from 'stream';
 
-import { uploadHandler } from './handlers/uploadHandler';
+import { exampleHandler } from './handlers/exampleHandler';
 import { HttpError } from './support/HttpError';
 import { parseIncomingMessage } from './support/parseIncomingMessage';
 
@@ -13,12 +15,12 @@ async function handleRequest(
   pathname: string,
   request: Request,
 ): Promise<Response> {
-  switch (pathname) {
-    case '/': {
+  switch (true) {
+    case pathname === '/': {
       return new Response('Hello World!');
     }
-    case '/upload': {
-      return await uploadHandler(request);
+    case pathname === '/example': {
+      return await exampleHandler(request);
     }
   }
   return new Response('Not Found', { status: 404 });
