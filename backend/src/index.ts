@@ -1,11 +1,52 @@
 import { createServer } from 'http';
+import { Readable } from 'stream';
+
+import { uploadHandler } from './handlers/uploadHandler';
+import { HttpError } from './support/HttpError';
+import { parseIncomingMessage } from './support/parseIncomingMessage';
 
 const PORT = 8000;
 
 const server = createServer();
 
-server.on('request', (request, response) => {
-  response.end('Hello world!');
+async function handleRequest(
+  pathname: string,
+  request: Request,
+): Promise<Response> {
+  switch (pathname) {
+    case '/': {
+      return new Response('Hello World!');
+    }
+    case '/upload': {
+      return await uploadHandler(request);
+    }
+  }
+  return new Response('Not Found', { status: 404 });
+}
+
+server.on('request', (req, res) => {
+  const [url, request] = parseIncomingMessage(req);
+  void handleRequest(url.pathname, request)
+    .catch((error: unknown) => {
+      if (error instanceof HttpError) {
+        const { status, message } = error;
+        return new Response(message, { status });
+      }
+      return new Response(String(error), { status: 500 });
+    })
+    .then((response) => {
+      const { status, statusText, headers, body } = response;
+      res.statusCode = status;
+      res.statusMessage = statusText;
+      for (const [name, value] of headers) {
+        res.setHeader(name, value);
+      }
+      if (body) {
+        Readable.fromWeb(body).pipe(res);
+      } else {
+        res.end();
+      }
+    });
 });
 
 server.listen(PORT, () => {
