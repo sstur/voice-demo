@@ -6,15 +6,32 @@
     "dev": "ts-node-dev --no-notify --respawn --transpile-only src/index.ts",
     "build": "tsc --outDir lib/",
     "typecheck": "tsc --noEmit",
-    "test": "npm run typecheck"
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
+    "test": "npm run typecheck && npm run format:check"
   },
   "dependencies": {
     "runtypes": "^6.7.0"
   },
   "devDependencies": {
+    "@ianvs/prettier-plugin-sort-imports": "^4.3.0",
     "@types/node": "^20.14.10",
+    "prettier": "^3.3.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.3.3"
+  },
+  "prettier": {
+    "singleQuote": true,
+    "plugins": [
+      "@ianvs/prettier-plugin-sort-imports"
+    ],
+    "importOrder": [
+      "<BUILTIN_MODULES>",
+      "",
+      "<THIRD_PARTY_MODULES>",
+      "",
+      "^[./]"
+    ]
   },
   "private": true
 }
