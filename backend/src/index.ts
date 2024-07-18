@@ -3,28 +3,20 @@ import 'dotenv/config';
 import { createServer } from 'http';
 import { Readable } from 'stream';
 
-import { exampleHandler } from './handlers/exampleHandler';
+import { handleRequest } from './handleRequest';
 import { HttpError } from './support/HttpError';
 import { parseIncomingMessage } from './support/parseIncomingMessage';
+import { wss } from './webSocketServer';
 
 const PORT = 8000;
 
 const server = createServer();
 
-async function handleRequest(
-  pathname: string,
-  request: Request,
-): Promise<Response> {
-  switch (true) {
-    case pathname === '/': {
-      return new Response('Hello World!');
-    }
-    case pathname === '/example': {
-      return await exampleHandler(request);
-    }
-  }
-  return new Response('Not Found', { status: 404 });
-}
+server.on('upgrade', (request, socket, head) => {
+  wss.handleUpgrade(request, socket, head, (ws) => {
+    wss.emit('connection', ws, request);
+  });
+});
 
 server.on('request', (req, res) => {
   const [url, request] = parseIncomingMessage(req);
