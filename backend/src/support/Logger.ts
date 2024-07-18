@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 
 const LogLevel = {
-  DEBUG: 3,
+  INFO: 3,
   WARN: 2,
   ERROR: 1,
 };
@@ -16,7 +16,7 @@ export function createLogger(options: Options = {}) {
   const level = LogLevel[options.level ?? 'WARN'];
   return {
     log(...args: Array<unknown>) {
-      if (level >= LogLevel.DEBUG) {
+      if (level >= LogLevel.INFO) {
         console.log(...args);
       }
     },

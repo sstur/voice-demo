@@ -15,11 +15,11 @@ const deepgram = createClient(DEEPGRAM_KEY);
 export const wss = new WebSocketServer({
   noServer: true,
   // This will terminate any upgrade request for any other pathname
-  path: '/sockets/transcribe',
+  path: '/sockets/chat',
 });
 
 wss.on('connection', (socket) => {
-  const logger = createLogger({ level: 'WARN' });
+  const logger = createLogger({ level: 'INFO' });
 
   const state = {
     isReceivingAudioData: true,
