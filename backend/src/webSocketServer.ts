@@ -1,15 +1,21 @@
-import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk';
+import type { LiveTranscriptionEvent } from '@deepgram/sdk';
+import {
+  createClient,
+  LiveConnectionState,
+  LiveTranscriptionEvents,
+} from '@deepgram/sdk';
 import type { ICloseEvent } from 'websocket';
 import { WebSocket, WebSocketServer } from 'ws';
 
+import { DEEPGRAM_KEY } from './support/constants';
 import { createLogger } from './support/Logger';
 
-const deepgram = createClient(process.env.DEEPGRAM_KEY ?? '');
+const deepgram = createClient(DEEPGRAM_KEY);
 
 export const wss = new WebSocketServer({
   noServer: true,
   // This will terminate any upgrade request for any other pathname
-  path: '/transcribe',
+  path: '/sockets/transcribe',
 });
 
 wss.on('connection', (socket) => {
@@ -37,7 +43,7 @@ wss.on('connection', (socket) => {
     dataQueue.push(data);
     if (
       state.isUpstreamInitialized &&
-      dgConnection.getReadyState() === WebSocket.OPEN
+      dgConnection.getReadyState() === LiveConnectionState.OPEN
     ) {
       flushQueue();
     }
@@ -86,17 +92,20 @@ wss.on('connection', (socket) => {
     socket.close(1011, `[Upstream error] ${String(error)}`);
   });
 
-  dgConnection.on(LiveTranscriptionEvents.Transcript, (data) => {
-    const isFinal = Boolean(data.is_final);
-    for (const { transcript } of data.channel.alternatives) {
-      if (typeof transcript === 'string') {
-        const text = transcript.trim();
-        socket.send(JSON.stringify({ type: 'RESULT', text, isFinal }));
+  dgConnection.on(
+    LiveTranscriptionEvents.Transcript,
+    (data: LiveTranscriptionEvent) => {
+      const isFinal = data.is_final ?? false;
+      for (const { transcript } of data.channel.alternatives) {
+        if (typeof transcript === 'string') {
+          const text = transcript.trim();
+          socket.send(JSON.stringify({ type: 'RESULT', text, isFinal }));
+        }
       }
-    }
-  });
+    },
+  );
 
-  socket.on('message', async (data, isBinary) => {
+  socket.on('message', (data, isBinary) => {
     const payload = parseIncomingData(toBuffer(data), isBinary);
     if (Buffer.isBuffer(payload)) {
       if (state.isReceivingAudioData) {
@@ -116,7 +125,7 @@ wss.on('connection', (socket) => {
 
   socket.on('close', () => {
     logger.log('>> Client connection closed.');
-    if (dgConnection.getReadyState() === WebSocket.OPEN) {
+    if (dgConnection.getReadyState() === LiveConnectionState.OPEN) {
       dgConnection.finish();
     }
   });
