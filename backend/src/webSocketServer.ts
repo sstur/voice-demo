@@ -1,8 +1,8 @@
 import type { LiveTranscriptionEvent } from '@deepgram/sdk';
 import {
   createClient,
-  LiveConnectionState,
   LiveTranscriptionEvents,
+  SOCKET_STATES,
 } from '@deepgram/sdk';
 import type { ICloseEvent } from 'websocket';
 import { WebSocket, WebSocketServer } from 'ws';
@@ -43,7 +43,7 @@ wss.on('connection', (socket) => {
     dataQueue.push(data);
     if (
       state.isUpstreamInitialized &&
-      dgConnection.getReadyState() === LiveConnectionState.OPEN
+      dgConnection.getReadyState() === SOCKET_STATES.open
     ) {
       flushQueue();
     }
@@ -125,7 +125,7 @@ wss.on('connection', (socket) => {
 
   socket.on('close', () => {
     logger.log('>> Client connection closed.');
-    if (dgConnection.getReadyState() === LiveConnectionState.OPEN) {
+    if (dgConnection.getReadyState() === SOCKET_STATES.open) {
       dgConnection.finish();
     }
   });
