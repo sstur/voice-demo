@@ -12,23 +12,32 @@ type Options = {
   level?: Level;
 };
 
+export class Logger {
+  level: number;
+
+  constructor(options: Options = {}) {
+    this.level = LogLevel[options.level ?? 'WARN'];
+  }
+
+  log(...args: Array<unknown>) {
+    if (this.level >= LogLevel.INFO) {
+      console.log(...args);
+    }
+  }
+
+  warn(...args: Array<unknown>) {
+    if (this.level >= LogLevel.WARN) {
+      console.warn(...args);
+    }
+  }
+
+  error(...args: Array<unknown>) {
+    if (this.level >= LogLevel.ERROR) {
+      console.error(...args);
+    }
+  }
+}
+
 export function createLogger(options: Options = {}) {
-  const level = LogLevel[options.level ?? 'WARN'];
-  return {
-    log(...args: Array<unknown>) {
-      if (level >= LogLevel.INFO) {
-        console.log(...args);
-      }
-    },
-    warn(...args: Array<unknown>) {
-      if (level >= LogLevel.WARN) {
-        console.warn(...args);
-      }
-    },
-    error(...args: Array<unknown>) {
-      if (level >= LogLevel.ERROR) {
-        console.error(...args);
-      }
-    },
-  };
+  return new Logger(options);
 }
