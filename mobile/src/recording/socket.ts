@@ -10,6 +10,11 @@ const MAX_WRITE_BUFFER = 64 * 1024;
 
 type Message = Record<string, unknown>;
 
+type WaitForMessageOptions = {
+  timeout?: number;
+  signal?: AbortSignal;
+};
+
 // TODO: Rename NONE state?
 type SocketState =
   | { name: 'NONE' }
@@ -41,12 +46,12 @@ export class Socket {
     await flush(ws);
   }
 
-  async waitForMessage(options?: { timeout?: number }) {
+  async waitForMessage(options?: WaitForMessageOptions) {
     const ws = this.getWebSocket('waitForMessage');
     return await waitForMessage(ws, undefined, options);
   }
 
-  async waitForMessageOfType(type: string, options?: { timeout?: number }) {
+  async waitForMessageOfType(type: string, options?: WaitForMessageOptions) {
     const ws = this.getWebSocket('waitForMessageOfType');
     return await waitForMessage(ws, (m) => m.type === type, options);
   }
@@ -103,19 +108,31 @@ function openWebSocket(ws: WebSocket) {
 function waitForMessage(
   ws: WebSocket,
   matcher?: (message: Message) => boolean,
-  options?: { timeout?: number },
+  options?: WaitForMessageOptions,
 ) {
-  const timeout = options?.timeout ?? 5000;
+  const { timeout = 5000, signal } = options ?? {};
   return new Promise<Message>((resolve, reject) => {
-    const timer = setTimeout(() => {
+    const cleanup = () => {
       ws.removeEventListener('message', onMessage);
+      signal?.removeEventListener('abort', onAbort);
+      if (timer !== null) {
+        clearTimeout(timer);
+      }
+    };
+    const onAbort = () => {
+      cleanup();
+      reject(new Error('Aborted'));
+    };
+    signal?.addEventListener('abort', onAbort);
+    const onTimeout = () => {
+      cleanup();
       reject(new Error('Timeout waiting for message'));
-    }, timeout);
+    };
+    const timer = timeout > 0 ? setTimeout(onTimeout, timeout) : null;
     const onMessage = (event: MessageEvent) => {
       const data: Message = Object(event.data);
       if (!matcher || matcher(data)) {
-        ws.removeEventListener('message', onMessage);
-        clearTimeout(timer);
+        cleanup();
         resolve(data);
       }
     };

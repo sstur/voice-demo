@@ -16,7 +16,10 @@ import { sleep } from '../support/sleep';
 
 const MAX_CHUNK_SIZE = 4 * 1024;
 
-export async function* createAsyncReadable(file: File, onDone: () => void) {
+export async function* createAsyncReadable(
+  file: File,
+  onDone: () => void,
+): AsyncGenerator<string, undefined> {
   const { fileUri } = file;
   let bytesProcessed = 0;
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition

@@ -1,13 +1,6 @@
+import { safeInvoke } from '../support/safeInvoke';
+import { startRecording, stopRecording } from './Recording';
 import { Socket } from './socket';
-
-// type ListeningState =
-//   | { state: 'INITIALIZING'; abort?: boolean }
-//   | { state: 'LISTENING'; listeningController: ListeningController }
-//   | { state: 'STOPPING' };
-
-// type AgentState =
-//   | { state: 'WAITING' }
-//   | { state: 'PLAYING'; playbackController: PlaybackController };
 
 type ConversationState =
   | { name: 'STOPPED' }
@@ -48,13 +41,43 @@ export class ConversationController {
     if (type !== 'READY') {
       throw new Error('Invalid ready message from server');
     }
-    const listeningController = new ListeningController(socket);
+    await this.startUserTurn(socket);
+  }
+
+  onError(error: unknown) {
+    this.state = { name: 'ERROR', error };
+  }
+
+  async startUserTurn(socket: Socket) {
+    const listeningController = new ListeningController({
+      socket,
+      onError: (error) => this.onError(error),
+      onDone: () => {
+        void this.startAgentTurn(socket);
+      },
+    });
     this.state = {
       name: 'RUNNING',
       socket,
       turn: { name: 'USER_SPEAKING', listeningController },
     };
     await this.invoke(() => listeningController.start());
+  }
+
+  async startAgentTurn(socket: Socket) {
+    const playbackController = new PlaybackController({
+      socket,
+      onError: (error) => this.onError(error),
+      onDone: () => {
+        void this.startUserTurn(socket);
+      },
+    });
+    this.state = {
+      name: 'RUNNING',
+      socket,
+      turn: { name: 'AGENT_SPEAKING', playbackController },
+    };
+    await this.invoke(() => playbackController.start());
   }
 }
 
@@ -66,10 +89,19 @@ class ListeningController {
     | { name: 'ERROR'; error: string }
     | { name: 'LISTENING' }
     | { name: 'STOPPING' };
+  onError: (error: unknown) => void;
+  onDone: () => void;
 
-  constructor(socket: Socket) {
+  constructor(init: {
+    socket: Socket;
+    onError: (error: unknown) => void;
+    onDone: () => void;
+  }) {
+    const { socket, onError, onDone } = init;
     this.socket = socket;
     this.state = { name: 'NONE' };
+    this.onError = onError;
+    this.onDone = onDone;
   }
 
   async start() {
@@ -82,19 +114,98 @@ class ListeningController {
     if (!message.success) {
       const errorMessage = String(message.error);
       this.state = { name: 'ERROR', error: errorMessage };
-      throw new Error(errorMessage);
+      this.onError(errorMessage);
+      return;
     }
+    // TODO: abort when we transition out of state LISTENING?
+    const abortController = new AbortController();
+    void this.socket
+      .waitForMessageOfType('STOP_UPLOAD_STREAM', {
+        signal: abortController.signal,
+      })
+      .then(() => {
+        // This will cause the sendStream below to finish up, calling onDone.
+        void stopRecording();
+      });
     const uploadStreamId = String(message.uploadStreamId);
-    const readableStream = await startRecording();
+    const result = await safeInvoke(() => startRecording());
+    if (!result.ok) {
+      const errorMessage = String(result.error);
+      this.state = { name: 'ERROR', error: errorMessage };
+      this.onError(errorMessage);
+      return;
+    }
+    this.state = { name: 'LISTENING' };
+    const readableStream = result.result;
+    this.sendStream(uploadStreamId, readableStream)
+      .then(() => {
+        // This means we called stopRecording(), e.g. from a STOP_UPLOAD_STREAM message from the server
+        this.onDone();
+      })
+      .catch((error: unknown) => {
+        // This means either the recording errored or a websocket issue
+        this.state = { name: 'ERROR', error: String(error) };
+        this.onError(error);
+      })
+      .finally(() => {
+        // Stop listening for the STOP_UPLOAD_STREAM message from server
+        abortController.abort();
+      });
+  }
+
+  private async sendStream(
+    uploadStreamId: string,
+    readableStream: AsyncGenerator<string, undefined>,
+  ) {
+    const { socket } = this;
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition, no-constant-condition
+    while (true) {
+      const { value, done } = await readableStream.next();
+      if (done) {
+        break;
+      }
+      await socket.send({ type: 'AUDIO_CHUNK', uploadStreamId, value });
+    }
   }
 }
 
 class PlaybackController {
   socket: Socket;
-  state: 'INITIALIZING' | 'PLAYING';
+  state:
+    | { name: 'NONE' }
+    | { name: 'INITIALIZING' }
+    | { name: 'ERROR'; error: string }
+    | { name: 'PLAYING' };
+  onError: (error: unknown) => void;
+  onDone: () => void;
 
-  constructor(socket: Socket) {
+  constructor(init: {
+    socket: Socket;
+    onError: (error: unknown) => void;
+    onDone: () => void;
+  }) {
+    const { socket, onError, onDone } = init;
     this.socket = socket;
-    this.state = 'INITIALIZING';
+    this.state = { name: 'NONE' };
+    this.onError = onError;
+    this.onDone = onDone;
+  }
+
+  async start() {
+    this.state = { name: 'INITIALIZING' };
+    void this.socket.send({ type: 'START_PLAYBACK' });
+    // { type: 'START_PLAYBACK_RESULT', success: true, playbackUrl: string } | { type: 'START_PLAYBACK_RESULT', success: false, error: string }
+    const message = await this.socket.waitForMessageOfType(
+      'START_PLAYBACK_RESULT',
+    );
+    if (!message.success) {
+      const errorMessage = String(message.error);
+      this.state = { name: 'ERROR', error: errorMessage };
+      this.onError(errorMessage);
+      return;
+    }
+    const playbackUrl = String(message.playbackUrl);
+    console.log({ playbackUrl });
+    // TODO: Setup playback
   }
 }

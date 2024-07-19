@@ -6,29 +6,44 @@ import { RECORDING_OPTIONS } from './constants';
 import { createAsyncReadable } from './createAsyncReadable';
 
 type RecordingState =
-  | { state: 'IDLE' }
-  | { state: 'STARTING' }
-  | { state: 'RECORDING'; recording: Audio.Recording; file: File }
-  | { state: 'STOPPING' };
+  | { name: 'IDLE' }
+  | { name: 'STARTING'; shouldAbort: boolean }
+  | { name: 'RECORDING'; recording: Audio.Recording; file: File }
+  | { name: 'STOPPING' };
 
 type Ref<T> = { current: T };
 
-const recordingState: Ref<RecordingState> = { current: { state: 'IDLE' } };
+const recordingState: Ref<RecordingState> = { current: { name: 'IDLE' } };
+
+function shouldAbort(state: RecordingState) {
+  return state.name === 'STARTING' && state.shouldAbort;
+}
 
 export async function startRecording() {
-  if (recordingState.current.state !== 'IDLE') {
-    return;
+  if (recordingState.current.name !== 'IDLE') {
+    const state = recordingState.current;
+    throw new Error(`Cannot start recording in state ${state.name}`);
   }
-  recordingState.current = { state: 'STARTING' };
-  // TODO: Reset back to idle if either of the following two await'd calls throw
+  recordingState.current = { name: 'STARTING', shouldAbort: false };
   await Audio.setAudioModeAsync({
     allowsRecordingIOS: true,
     playsInSilentModeIOS: true,
   });
+  if (shouldAbort(recordingState.current)) {
+    recordingState.current = { name: 'IDLE' };
+    throw new Error('Initialization Aborted');
+  }
   const { recording } = await Audio.Recording.createAsync(RECORDING_OPTIONS);
+  if (shouldAbort(recordingState.current)) {
+    recordingState.current = { name: 'STOPPING' };
+    void stopAndUnloadAsync(recording).finally(() => {
+      recordingState.current = { name: 'IDLE' };
+    });
+    throw new Error('Initialization Aborted');
+  }
   const fileUri = recording.getURI() ?? '';
   const file = new File(fileUri);
-  recordingState.current = { state: 'RECORDING', recording, file };
+  recordingState.current = { name: 'RECORDING', recording, file };
 
   return createAsyncReadable(file, () => {
     FileSystem.deleteAsync(fileUri, { idempotent: true }).catch(
@@ -44,12 +59,25 @@ export async function startRecording() {
 
 export async function stopRecording() {
   const state = recordingState.current;
-  // TODO: If we're in state STARTING, somehow abort
-  if (state.state !== 'RECORDING') {
+  if (state.name === 'STARTING') {
+    recordingState.current = { name: 'STARTING', shouldAbort: true };
     return;
   }
+  if (state.name === 'IDLE' || state.name === 'STOPPING') {
+    return;
+  }
+  recordingState.current = { name: 'STOPPING' };
   const { recording, file } = state;
-  recordingState.current = { state: 'STOPPING' };
+  try {
+    await stopAndUnloadAsync(recording);
+  } finally {
+    recordingState.current = { name: 'IDLE' };
+  }
+  // This indicates that we're done done writing to the file.
+  file.close();
+}
+
+async function stopAndUnloadAsync(recording: Audio.Recording) {
   try {
     await recording.stopAndUnloadAsync();
   } catch (error) {
@@ -57,9 +85,5 @@ export async function stopRecording() {
       // eslint-disable-next-line no-console
       console.error('Error calling recording.stopAndUnloadAsync():', error);
     }
-  } finally {
-    recordingState.current = { state: 'IDLE' };
   }
-  // This indicates that we're done done writing to the file.
-  file.close();
 }
