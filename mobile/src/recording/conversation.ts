@@ -166,6 +166,7 @@ class ListeningController {
       }
       await socket.send({ type: 'AUDIO_CHUNK', uploadStreamId, value });
     }
+    await socket.send({ type: 'AUDIO_DONE', uploadStreamId });
   }
 }
 
