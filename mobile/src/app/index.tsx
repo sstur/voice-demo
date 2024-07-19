@@ -1,6 +1,6 @@
-import { Stack } from 'expo-router';
+import { Link, Stack } from 'expo-router';
 
-import { Text, VStack } from '../components/core';
+import { Button, VStack } from '../components/core';
 
 export default function Page() {
   return (
@@ -12,7 +12,9 @@ export default function Page() {
         }}
       />
       <VStack flex={1} justifyContent="center" alignItems="center">
-        <Text>{t('Hello World')}</Text>
+        <Link href="/chat" asChild>
+          <Button>{t('Chat')}</Button>
+        </Link>
       </VStack>
     </>
   );
