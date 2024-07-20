@@ -43,6 +43,6 @@ export class AgentController {
 
   getOutputUrl() {
     const { contextId } = this;
-    return `/playback/${contextId}.m4a`;
+    return `/playback/${contextId}`;
   }
 }
