@@ -12,6 +12,7 @@
     "test": "npm run typecheck && npm run lint && npm run format:check"
   },
   "dependencies": {
+    "@cartesia/cartesia-js": "^1.0.1",
     "@deepgram/sdk": "3.5.0",
     "@types/websocket": "^1.0.10",
     "openai": "^4.52.7",

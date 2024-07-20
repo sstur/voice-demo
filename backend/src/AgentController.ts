@@ -7,34 +7,42 @@ import { voiceResponseStore } from './voiceResponseStore';
 export class AgentController {
   state: { name: 'NONE' } = { name: 'NONE' };
   userInput: string;
-  responseId: string;
+  contextId: string;
   outputQueue: AsyncQueue<Buffer>;
+  onError: (error: unknown) => void;
   onDone: () => void;
 
-  constructor(init: { userInput: string; onDone: () => void }) {
-    const { userInput, onDone } = init;
+  constructor(init: {
+    userInput: string;
+    onError: (error: unknown) => void;
+    onDone: () => void;
+  }) {
+    const { userInput, onError, onDone } = init;
     this.userInput = userInput;
-    const responseId = (this.responseId = createId());
+    const contextId = (this.contextId = createId());
     const outputQueue = (this.outputQueue = new AsyncQueue<Buffer>());
-    voiceResponseStore.set(responseId, outputQueue);
+    voiceResponseStore.set(contextId, outputQueue);
+    this.onError = onError;
     this.onDone = onDone;
   }
 
   async start() {
-    const { userInput, outputQueue, onDone } = this;
+    const { userInput, contextId, outputQueue, onError, onDone } = this;
     const responseStream = await createAgentResponse(userInput);
     const voiceController = new VoiceController({
       inputStream: responseStream,
+      contextId,
       onChunk: (chunk) => {
         void outputQueue.write(chunk);
       },
+      onError: (error) => onError(error),
       onDone: () => onDone(),
     });
     await voiceController.start();
   }
 
   getOutputUrl() {
-    const { responseId } = this;
-    return `/playback/${responseId}.m4a`;
+    const { contextId } = this;
+    return `/playback/${contextId}.m4a`;
   }
 }
