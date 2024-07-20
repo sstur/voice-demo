@@ -128,11 +128,12 @@ wss.on('connection', (socket) => {
 
 function toString(input: Buffer | ArrayBuffer | Array<Buffer>) {
   if (Buffer.isBuffer(input)) {
-    return input;
+    return input.toString('utf8');
   }
   if (Array.isArray(input)) {
-    return Buffer.concat(input);
+    return Buffer.concat(input).toString('utf8');
   }
+  return Buffer.from(input).toString('utf8');
 }
 
 function safeParse(input: string): unknown {
@@ -147,7 +148,7 @@ function isObject(input: unknown): input is Record<string, unknown> {
   return input !== null && typeof input === 'object' && !Array.isArray(input);
 }
 
-function parseMessage(input: unknown): Record<string, unknown> {
-  const result = typeof input === 'string' ? safeParse(input) : null;
-  return isObject(result) ? result : {};
+function parseMessage(input: string): Record<string, unknown> {
+  const value = safeParse(input);
+  return isObject(value) ? value : { value };
 }
