@@ -13,6 +13,7 @@ type Message = Record<string, unknown>;
 type WaitForMessageOptions = {
   timeout?: number;
   signal?: AbortSignal;
+  messageTypeForDebugging?: string;
 };
 
 // TODO: Rename NONE state?
@@ -46,14 +47,20 @@ export class Socket {
     await flush(ws);
   }
 
-  async waitForMessage(options?: WaitForMessageOptions) {
+  async waitForMessage(options: WaitForMessageOptions = {}) {
     const ws = this.getWebSocket('waitForMessage');
     return await waitForMessage(ws, undefined, options);
   }
 
-  async waitForMessageOfType(type: string, options?: WaitForMessageOptions) {
+  async waitForMessageOfType(
+    type: string,
+    options: WaitForMessageOptions = {},
+  ) {
     const ws = this.getWebSocket('waitForMessageOfType');
-    return await waitForMessage(ws, (m) => m.type === type, options);
+    return await waitForMessage(ws, (m) => m.type === type, {
+      ...options,
+      messageTypeForDebugging: type,
+    });
   }
 
   async close() {
@@ -110,10 +117,11 @@ function waitForMessage(
   matcher?: (message: Message) => boolean,
   options?: WaitForMessageOptions,
 ) {
-  const { timeout = 5000, signal } = options ?? {};
+  const { timeout = 5000, signal, messageTypeForDebugging } = options ?? {};
   return new Promise<Message>((resolve, reject) => {
     const cleanup = () => {
       ws.removeEventListener('message', onMessage);
+      ws.removeEventListener('close', onClose);
       signal?.removeEventListener('abort', onAbort);
       if (timer !== null) {
         clearTimeout(timer);
@@ -126,14 +134,34 @@ function waitForMessage(
     signal?.addEventListener('abort', onAbort);
     const onTimeout = () => {
       cleanup();
-      reject(new Error('Timeout waiting for message'));
+      const errorMessage = 'Timeout waiting for message';
+      reject(
+        new Error(
+          messageTypeForDebugging
+            ? errorMessage + ' ' + messageTypeForDebugging
+            : errorMessage,
+        ),
+      );
     };
     const timer = timeout > 0 ? setTimeout(onTimeout, timeout) : null;
+    const onClose = (_event: CloseEvent) => {
+      cleanup();
+      const errorMessage = 'Socket closed while waiting for message';
+      reject(
+        new Error(
+          messageTypeForDebugging
+            ? errorMessage + ' ' + messageTypeForDebugging
+            : errorMessage,
+        ),
+      );
+    };
+    ws.addEventListener('close', onClose);
     const onMessage = (event: MessageEvent) => {
-      const data: Message = Object(event.data);
-      if (!matcher || matcher(data)) {
+      const data: unknown = event.data;
+      const message: Message = typeof data === 'string' ? safeParse(data) : {};
+      if (!matcher || matcher(message)) {
         cleanup();
-        resolve(data);
+        resolve(message);
       }
     };
     ws.addEventListener('message', onMessage);
@@ -163,4 +191,17 @@ function closeWebSocket(ws: WebSocket, code?: number, reason?: string) {
     });
     ws.close(code, reason);
   });
+}
+
+function isObject(input: unknown): input is Record<string, unknown> {
+  return Object(input) === input && !Array.isArray(input);
+}
+
+function safeParse(input: string): Record<string, unknown> {
+  try {
+    const value = JSON.parse(input);
+    return isObject(value) ? value : { value };
+  } catch {
+    return {};
+  }
 }
