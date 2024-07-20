@@ -24,7 +24,7 @@ export const wss = new WebSocketServer({
 });
 
 wss.on('connection', (socket) => {
-  const logger = createLogger({ level: 'INFO' });
+  const logger = createLogger({ level: 'DEBUG' });
 
   const state: Ref<ConversationState> = { current: { name: 'IDLE' } };
 
@@ -108,7 +108,7 @@ wss.on('connection', (socket) => {
   });
 
   socket.on('error', (error) => {
-    logger.log('>> Client connection error:', error);
+    logger.log('Client connection error:', error);
     if (state.current.name === 'RECEIVING_AUDIO') {
       const { transcriber } = state.current;
       transcriber.terminate();
@@ -116,12 +116,14 @@ wss.on('connection', (socket) => {
   });
 
   socket.on('close', () => {
-    logger.log('>> Client connection closed.');
+    logger.log('Client connection closed.');
     if (state.current.name === 'RECEIVING_AUDIO') {
       const { transcriber } = state.current;
       transcriber.terminate();
     }
   });
+
+  send({ type: 'READY' });
 });
 
 function toString(input: Buffer | ArrayBuffer | Array<Buffer>) {
