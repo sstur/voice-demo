@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  emittery: 0.13.1
+
 dependencies:
   '@cartesia/cartesia-js':
     specifier: ^1.0.1
@@ -288,7 +291,7 @@ packages:
     dependencies:
       base64-js: 1.5.1
       cross-fetch: 4.0.0
-      emittery: 1.0.3
+      emittery: 0.13.1
       human-id: 4.1.1
       partysocket: 1.0.1
     transitivePeerDependencies:
@@ -1103,9 +1106,9 @@ packages:
     resolution: {integrity: sha512-8RwI6gKUokbHWcN3iRij/qpvf/wCbIVY5slODi85werwqUQwpFXM+dvUBND93Qh7SB0pW3Hlq3/wZsqQ3M9Jaw==}
     dev: true
 
-  /emittery@1.0.3:
-    resolution: {integrity: sha512-tJdCJitoy2lrC2ldJcqN4vkqJ00lT+tOWNT1hBJjO/3FDMJa5TTIiYGCKGkn/WfCyOzUMObeohbVTj00fhiLiA==}
-    engines: {node: '>=14.16'}
+  /emittery@0.13.1:
+    resolution: {integrity: sha512-DeWwawk6r5yR9jFgnDKYt4sLS0LmHJJi3ZOnb5/JdbYwj3nW+FxQnHIjhBKz8YLC7oRNPVM9NQ47I3CVx34eqQ==}
+    engines: {node: '>=12'}
     dev: false
 
   /es-abstract@1.23.3:
