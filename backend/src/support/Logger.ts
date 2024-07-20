@@ -1,6 +1,7 @@
 /* eslint-disable no-console */
 
 const LogLevel = {
+  DEBUG: 4,
   INFO: 3,
   WARN: 2,
   ERROR: 1,
@@ -13,10 +14,16 @@ type Options = {
 };
 
 export class Logger {
-  level: number;
+  private level: number;
 
   constructor(options: Options = {}) {
     this.level = LogLevel[options.level ?? 'WARN'];
+  }
+
+  debug(...args: Array<unknown>) {
+    if (this.level >= LogLevel.DEBUG) {
+      console.log(...args);
+    }
   }
 
   log(...args: Array<unknown>) {
