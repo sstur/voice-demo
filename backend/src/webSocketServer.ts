@@ -55,6 +55,7 @@ wss.on('connection', (socket) => {
             const _isSuccess = code === 1000;
             const result = chunks.join('');
             logger.log({ transcriptionResult: result });
+            // TODO: If result is empty, what should we do?
             const agentController = new AgentController({
               userInput: result,
               onError: (error) => {
