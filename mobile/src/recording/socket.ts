@@ -194,7 +194,7 @@ function closeWebSocket(ws: WebSocket, code?: number, reason?: string) {
 }
 
 function isObject(input: unknown): input is Record<string, unknown> {
-  return Object(input) === input && !Array.isArray(input);
+  return input !== null && typeof input === 'object' && !Array.isArray(input);
 }
 
 function safeParse(input: string): Record<string, unknown> {
