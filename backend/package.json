@@ -14,6 +14,7 @@
   "dependencies": {
     "@deepgram/sdk": "3.5.0",
     "@types/websocket": "^1.0.10",
+    "openai": "^4.52.7",
     "runtypes": "^6.7.0",
     "ws": "^8.18.0"
   },

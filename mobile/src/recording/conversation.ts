@@ -107,7 +107,7 @@ class ListeningController {
   async start() {
     this.state = { name: 'INITIALIZING' };
     void this.socket.send({ type: 'START_UPLOAD_STREAM' });
-    // { type: 'START_UPLOAD_STREAM_RESULT', success: true, uploadStreamId: string } | { type: 'START_UPLOAD_STREAM_RESULT', success: false, error: string }
+    // { type: 'START_UPLOAD_STREAM_RESULT', success: true } | { type: 'START_UPLOAD_STREAM_RESULT', success: false, error: string }
     const message = await this.socket.waitForMessageOfType(
       'START_UPLOAD_STREAM_RESULT',
     );
@@ -127,7 +127,6 @@ class ListeningController {
         // This will cause the sendStream below to finish up, calling onDone.
         void stopRecording();
       });
-    const uploadStreamId = String(message.uploadStreamId);
     const result = await safeInvoke(() => startRecording());
     if (!result.ok) {
       const errorMessage = String(result.error);
@@ -137,7 +136,7 @@ class ListeningController {
     }
     this.state = { name: 'LISTENING' };
     const readableStream = result.result;
-    this.sendStream(uploadStreamId, readableStream)
+    this.sendStream(readableStream)
       .then(() => {
         // This means we called stopRecording(), e.g. from a STOP_UPLOAD_STREAM message from the server
         this.onDone();
@@ -153,10 +152,7 @@ class ListeningController {
       });
   }
 
-  private async sendStream(
-    uploadStreamId: string,
-    readableStream: AsyncGenerator<string, undefined>,
-  ) {
+  private async sendStream(readableStream: AsyncGenerator<string, undefined>) {
     const { socket } = this;
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition, no-constant-condition
     while (true) {
@@ -164,9 +160,9 @@ class ListeningController {
       if (done) {
         break;
       }
-      await socket.send({ type: 'AUDIO_CHUNK', uploadStreamId, value });
+      await socket.send({ type: 'AUDIO_CHUNK', value });
     }
-    await socket.send({ type: 'AUDIO_DONE', uploadStreamId });
+    await socket.send({ type: 'AUDIO_DONE' });
   }
 }
 

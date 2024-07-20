@@ -1,7 +1,21 @@
-import { WebSocket, WebSocketServer } from 'ws';
+import { WebSocketServer } from 'ws';
 
+import { AgentController } from './AgentController';
 import { createTranscriber } from './deepgram';
 import { createLogger } from './support/Logger';
+
+type Transcriber = ReturnType<typeof createTranscriber>;
+
+type ConversationState =
+  | { name: 'IDLE' }
+  | { name: 'RECEIVING_AUDIO'; transcriber: Transcriber }
+  | { name: 'FINALIZING_TRANSCRIPTION' }
+  | { name: 'AGENT_WORKING'; agentController: AgentController }
+  | { name: 'AGENT_DONE' }
+  | { name: 'CLOSED' }
+  | { name: 'ERROR'; error: unknown };
+
+type Ref<T> = { current: T };
 
 export const wss = new WebSocketServer({
   noServer: true,
@@ -12,92 +26,107 @@ export const wss = new WebSocketServer({
 wss.on('connection', (socket) => {
   const logger = createLogger({ level: 'INFO' });
 
-  const transcriber = createTranscriber({
-    logger,
-    onText: ({ text, isFinal }) => {
-      socket.send(JSON.stringify({ type: 'RESULT', text, isFinal }));
-    },
-    onError: (error) => {
-      if (socket.readyState !== WebSocket.OPEN) {
-        return;
-      }
-      socket.close(1011, `[Upstream error] ${String(error)}`);
-    },
-    onClose: ({ code, reason }) => {
-      if (socket.readyState !== WebSocket.OPEN) {
-        return;
-      }
-      // This represents "normal closure"
-      if (code === 1000) {
-        socket.close(code);
-        return;
-      }
-      // The upstream connection may have given us a potentially invalid status
-      // code, for example: "1006: Socket Error" Our server library will not
-      // allow any 1xxx code except those in the range(s): 1000-1003, 1007-1014
-      // See: https://github.com/websockets/ws/blob/8.17.0/lib/validation.js#L35-L44
-      // Here we're using status code 1011 which "indicates that a server is
-      // terminating the connection because it encountered an unexpected
-      // condition"
-      // See: https://www.rfc-editor.org/rfc/rfc6455.html#section-7.4
-      socket.close(1011, `[Upstream] ${code}: ${reason}`);
-    },
-  });
+  const state: Ref<ConversationState> = { current: { name: 'IDLE' } };
 
-  const state = {
-    isReceivingAudioData: true,
+  const send = (message: Record<string, unknown>) => {
+    socket.send(JSON.stringify(message));
   };
 
   socket.on('message', (data, isBinary) => {
-    const payload = parseIncomingData(toBuffer(data), isBinary);
-    if (Buffer.isBuffer(payload)) {
-      if (state.isReceivingAudioData) {
-        transcriber.send(payload);
-      }
+    // Not currently supporting binary messages
+    if (isBinary) {
       return;
     }
-    if (payload.type === 'DONE' && state.isReceivingAudioData) {
-      state.isReceivingAudioData = false;
-      transcriber.send('DONE');
+    const payload = parseMessage(toString(data));
+    switch (payload.type) {
+      case 'START_UPLOAD_STREAM': {
+        const chunks: Array<string> = [];
+        const transcriber = createTranscriber({
+          logger,
+          onText: (text, { isFinal }) => {
+            if (isFinal) {
+              chunks.push(text);
+            }
+          },
+          onError: (_error) => {
+            // TODO
+          },
+          onClose: ({ code }) => {
+            const _isSuccess = code === 1000;
+            const result = chunks.join('');
+            logger.log({ transcriptionResult: result });
+            const agentController = new AgentController({
+              userInput: result,
+              onDone: () => {
+                state.current = { name: 'AGENT_DONE' };
+              },
+            });
+            state.current = { name: 'AGENT_WORKING', agentController };
+            void agentController.start();
+          },
+        });
+        state.current = { name: 'RECEIVING_AUDIO', transcriber };
+        send({ type: 'START_UPLOAD_STREAM_RESULT', success: true });
+        break;
+      }
+      case 'AUDIO_CHUNK': {
+        if (state.current.name === 'RECEIVING_AUDIO') {
+          const { transcriber } = state.current;
+          const { value } = payload;
+          if (typeof value === 'string') {
+            const data = Buffer.from(value, 'utf8');
+            transcriber.send(data);
+          }
+        }
+        break;
+      }
+      case 'AUDIO_DONE': {
+        if (state.current.name === 'RECEIVING_AUDIO') {
+          const { transcriber } = state.current;
+          state.current = { name: 'FINALIZING_TRANSCRIPTION' };
+          transcriber.done();
+        }
+        break;
+      }
+      case 'START_PLAYBACK': {
+        const currentState = state.current;
+        if (currentState.name === 'AGENT_WORKING') {
+          const { agentController } = currentState;
+          const playbackUrl = agentController.getOutputUrl();
+          send({ type: 'START_PLAYBACK_RESULT', success: true, playbackUrl });
+        } else {
+          const error = `Unable to start playback in state ${currentState.name}`;
+          send({ type: 'START_PLAYBACK_RESULT', success: false, error });
+        }
+        break;
+      }
     }
   });
 
-  socket.on('error', (_error) => {
-    // TODO: Terminate Deepgram connection
+  socket.on('error', (error) => {
+    logger.log('>> Client connection error:', error);
+    if (state.current.name === 'RECEIVING_AUDIO') {
+      const { transcriber } = state.current;
+      transcriber.terminate();
+    }
   });
 
   socket.on('close', () => {
     logger.log('>> Client connection closed.');
-    transcriber.requestClose();
+    if (state.current.name === 'RECEIVING_AUDIO') {
+      const { transcriber } = state.current;
+      transcriber.terminate();
+    }
   });
 });
 
-function parseIncomingData(payload: Buffer, isBinary: boolean) {
-  if (isBinary) {
-    return payload;
-  }
-  const stringPayload = payload.toString();
-  // The string here should be either a JSON-encoded object or base64-encoded
-  // binary data. We can determine which one by checking the first character
-  // since a JSON object will start with a "{" and a base64-encoded string can
-  // never start with that character (only [A-Za-z0-9+/=]).
-  const isJson = stringPayload.charAt(0) === '{';
-  if (isJson) {
-    return parseMessage(stringPayload);
-  }
-  // Here we can assume the string payload is base-64 encoded binary data.
-  // Since RN on Android cannot send a binary payload, we're using base64.
-  return Buffer.from(stringPayload, 'base64');
-}
-
-function toBuffer(input: Buffer | ArrayBuffer | Array<Buffer>): Buffer {
+function toString(input: Buffer | ArrayBuffer | Array<Buffer>) {
   if (Buffer.isBuffer(input)) {
     return input;
   }
   if (Array.isArray(input)) {
     return Buffer.concat(input);
   }
-  return Buffer.from(input);
 }
 
 function safeParse(input: string): unknown {

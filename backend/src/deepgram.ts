@@ -13,7 +13,7 @@ const deepgram = createClient(DEEPGRAM_KEY);
 
 export function createTranscriber(init: {
   logger: Logger;
-  onText: (event: { text: string; isFinal: boolean }) => void;
+  onText: (text: string, details: { isFinal: boolean }) => void;
   onError: (error: unknown) => void;
   onClose: (event: ICloseEvent) => void;
 }) {
@@ -76,15 +76,21 @@ export function createTranscriber(init: {
       for (const { transcript } of data.channel.alternatives) {
         if (typeof transcript === 'string') {
           const text = transcript.trim();
-          onText({ text, isFinal });
+          onText(text, { isFinal });
         }
       }
     },
   );
 
   return {
-    send,
-    requestClose: () => {
+    send: (data: Buffer) => {
+      send(data);
+    },
+    done: () => {
+      send('DONE');
+    },
+    terminate: () => {
+      // TODO: This should hard-close the connection
       if (dgConnection.getReadyState() === SOCKET_STATES.open) {
         dgConnection.requestClose();
       }
