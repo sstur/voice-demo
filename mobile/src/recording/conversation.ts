@@ -44,6 +44,20 @@ export class ConversationController {
     await this.startUserTurn(socket);
   }
 
+  // TODO: Rename this?
+  stopListening() {
+    const { state } = this;
+    if (state.name !== 'RUNNING') {
+      return;
+    }
+    const { turn } = state;
+    if (turn.name !== 'USER_SPEAKING') {
+      return;
+    }
+    const { listeningController } = turn;
+    listeningController.stop();
+  }
+
   onError(error: unknown) {
     this.state = { name: 'ERROR', error };
   }
@@ -124,8 +138,7 @@ class ListeningController {
         signal: abortController.signal,
       })
       .then(() => {
-        // This will cause the sendStream below to finish up, calling onDone.
-        void stopRecording();
+        this.stop();
       });
     const result = await safeInvoke(() => startRecording());
     if (!result.ok) {
@@ -150,6 +163,11 @@ class ListeningController {
         // Stop listening for the STOP_UPLOAD_STREAM message from server
         abortController.abort();
       });
+  }
+
+  stop() {
+    // This will cause the sendStream to finish up, calling onDone.
+    void stopRecording();
   }
 
   private async sendStream(readableStream: AsyncGenerator<string, undefined>) {

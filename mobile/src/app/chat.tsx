@@ -33,18 +33,16 @@ function PageContent() {
     );
   }
 
-  return (
-    <VStack flex={1}>
-      <ConversationalChat />
-    </VStack>
-  );
+  return <ConversationalChat />;
 }
 
 export default function Page() {
   return (
     <>
       <Stack.Screen options={{ title: t('Chat') }} />
-      <PageContent />
+      <VStack flex={1} bc="white">
+        <PageContent />
+      </VStack>
     </>
   );
 }

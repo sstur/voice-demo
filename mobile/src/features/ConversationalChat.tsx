@@ -1,10 +1,57 @@
+import { useState } from 'react';
+
 import { Button, Text, VStack } from '../components/core';
+import { ConversationController } from '../recording/conversation';
+
+type State =
+  | { name: 'IDLE' }
+  | { name: 'CONVERSATION_ONGOING'; controller: ConversationController };
 
 export function ConversationalChat() {
+  const [state, setState] = useState<State>({ name: 'IDLE' });
+
+  const isTalking = () => {
+    if (state.name === 'CONVERSATION_ONGOING') {
+      const { controller } = state;
+      if (controller.state.name === 'RUNNING') {
+        const { turn } = controller.state;
+        return turn.name === 'USER_SPEAKING';
+      }
+    }
+    return false;
+  };
+
   return (
     <VStack flex={1} justifyContent="center" alignItems="center">
-      <Text>{t('Ready')}</Text>
-      <Button>{t('Start')}</Button>
+      {state.name === 'IDLE' ? (
+        <>
+          <Text>{t('Ready')}</Text>
+          <Button
+            onPress={() => {
+              const controller = new ConversationController();
+              setState({ name: 'CONVERSATION_ONGOING', controller });
+              void controller.start();
+            }}
+          >
+            {t('Start')}
+          </Button>
+        </>
+      ) : (
+        <>
+          <Text>{t('Running...')}</Text>
+          {isTalking() ? (
+            <Button
+              onPress={() => {
+                const controller = new ConversationController();
+                setState({ name: 'CONVERSATION_ONGOING', controller });
+                void controller.start();
+              }}
+            >
+              {t('Done Talking')}
+            </Button>
+          ) : null}
+        </>
+      )}
     </VStack>
   );
 }
