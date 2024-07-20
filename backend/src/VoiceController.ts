@@ -32,7 +32,7 @@ export class VoiceController {
     const { inputStream, contextId, onChunk, onError, onDone } = this;
 
     const websocket = cartesia.tts.websocket({
-      container: 'raw',
+      container: 'wav',
       encoding: 'pcm_s16le',
       sampleRate: 44100,
     });

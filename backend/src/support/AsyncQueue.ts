@@ -4,10 +4,18 @@ type EventMap = {
   change: [];
 };
 
-export class AsyncQueue<T> implements AsyncIterator<T, undefined> {
+export class AsyncQueue<T> implements AsyncIterableIterator<T> {
   private queue: Array<T> = [];
   private isClosed = false;
   private emitter = new EventEmitter<EventMap>();
+  private onConsumed?: () => void;
+
+  constructor(init: { onConsumed?: () => void } = {}) {
+    const { onConsumed } = init;
+    if (onConsumed) {
+      this.onConsumed = onConsumed;
+    }
+  }
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async write(value: T) {
@@ -37,6 +45,11 @@ export class AsyncQueue<T> implements AsyncIterator<T, undefined> {
         this.emitter.once('change', resolve),
       );
     }
+    this.onConsumed?.();
     return { done: true, value: undefined };
+  }
+
+  [Symbol.asyncIterator]() {
+    return this;
   }
 }

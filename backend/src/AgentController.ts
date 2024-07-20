@@ -20,7 +20,12 @@ export class AgentController {
     const { userInput, onError, onDone } = init;
     this.userInput = userInput;
     const contextId = (this.contextId = createId());
-    const outputQueue = (this.outputQueue = new AsyncQueue<Buffer>());
+    const outputQueue = new AsyncQueue<Buffer>({
+      onConsumed: () => {
+        voiceResponseStore.delete(contextId);
+      },
+    });
+    this.outputQueue = outputQueue;
     voiceResponseStore.set(contextId, outputQueue);
     this.onError = onError;
     this.onDone = onDone;

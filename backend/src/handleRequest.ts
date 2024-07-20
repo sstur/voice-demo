@@ -1,4 +1,4 @@
-import { exampleHandler } from './handlers/exampleHandler';
+import { playbackHandler } from './handlers/playbackHandler';
 
 export async function handleRequest(
   pathname: string,
@@ -8,8 +8,8 @@ export async function handleRequest(
     case pathname === '/': {
       return new Response('Hello World!');
     }
-    case pathname === '/example': {
-      return await exampleHandler(request);
+    case pathname.startsWith('/playback/'): {
+      return await playbackHandler(request);
     }
   }
   return new Response('Not Found', { status: 404 });
