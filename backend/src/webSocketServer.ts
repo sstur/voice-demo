@@ -59,7 +59,8 @@ wss.on('connection', (socket) => {
             const agentController = new AgentController({
               userInput: result,
               onError: (error) => {
-                // TODO: log, cleanup?
+                // TODO: Cleanup?
+                logger.error(error);
                 state.current = { name: 'ERROR', error };
               },
               onDone: () => {

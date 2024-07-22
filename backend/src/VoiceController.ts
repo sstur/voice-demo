@@ -41,6 +41,7 @@ export class VoiceController {
       await websocket.connect();
     } catch (error) {
       onError(error);
+      return;
     }
 
     let isStreaming = false;
