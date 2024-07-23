@@ -11,6 +11,7 @@ import type { Logger } from './support/Logger';
 
 const deepgram = createClient(DEEPGRAM_KEY);
 
+// TODO: Proper state
 export function createTranscriber(init: {
   logger: Logger;
   onText: (text: string, details: { isFinal: boolean }) => void;
