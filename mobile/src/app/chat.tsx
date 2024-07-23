@@ -40,9 +40,7 @@ export default function Page() {
   return (
     <>
       <Stack.Screen options={{ title: t('Chat') }} />
-      <VStack flex={1} bc="white">
-        <PageContent />
-      </VStack>
+      <PageContent />
     </>
   );
 }

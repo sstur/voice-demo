@@ -1,18 +1,29 @@
 import { SplashScreen, Stack } from 'expo-router';
+import { useTheme } from 'tamagui';
 
 import { AppProvider } from '../providers/AppProvider';
 
 void SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
+function RootContent() {
+  const theme = useTheme();
+  return (
+    <Stack
+      screenOptions={{
+        headerTintColor: theme.color.get(),
+        headerBackTitleVisible: false,
+        contentStyle: {
+          backgroundColor: theme.background.get(),
+        },
+      }}
+    />
+  );
+}
+
+export default function Layout() {
   return (
     <AppProvider onInitialized={() => SplashScreen.hideAsync()}>
-      <Stack
-        screenOptions={{
-          headerTintColor: '#fff',
-          headerBackTitleVisible: false,
-        }}
-      />
+      <RootContent />
     </AppProvider>
   );
 }

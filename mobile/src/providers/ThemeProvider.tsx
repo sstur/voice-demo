@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useColorScheme, View } from 'react-native';
+import { useColorScheme } from 'react-native';
 import {
   DarkTheme,
   DefaultTheme,
@@ -11,22 +11,13 @@ import config from '../config/tamagui.config';
 
 export function ThemeProvider(props: { children: ReactNode }) {
   const colorScheme = useColorScheme();
-  // TODO: Use a constant here or get it from our theme config
-  const backgroundColor = colorScheme === 'dark' ? '#0E1116' : 'white';
   return (
     <TamaguiProvider config={config}>
       <Theme name={colorScheme === 'dark' ? 'dark' : 'light'}>
         <NavigationThemeProvider
           value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}
         >
-          <View
-            style={{
-              flex: 1,
-              backgroundColor,
-            }}
-          >
-            {props.children}
-          </View>
+          {props.children}
         </NavigationThemeProvider>
       </Theme>
     </TamaguiProvider>
