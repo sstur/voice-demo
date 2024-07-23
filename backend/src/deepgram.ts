@@ -64,9 +64,9 @@ export function createTranscriber(init: {
     onClose(event);
   });
 
-  dgConnection.on('error', (error) => {
-    logger.warn('dgConnection received error:', error);
-    onError(error);
+  dgConnection.on('error', (event) => {
+    logger.warn('dgConnection received error:', toError(event));
+    onError(event);
   });
 
   dgConnection.on(
@@ -96,4 +96,15 @@ export function createTranscriber(init: {
       }
     },
   };
+}
+
+/**
+ * The parameter sent to the onError handler for Deepgram can be any value, but is likely a ErrorEvent.
+ */
+function toError(input: unknown): Error {
+  const object = Object(input);
+  if (object.__proto__?.constructor.name === 'ErrorEvent') {
+    return toError(object.error);
+  }
+  return input instanceof Error ? input : new Error(String(input));
 }
