@@ -1,8 +1,8 @@
 import type { LiveTranscriptionEvent } from '@deepgram/sdk';
 import {
   createClient,
+  LiveConnectionState,
   LiveTranscriptionEvents,
-  SOCKET_STATES,
 } from '@deepgram/sdk';
 import type { ICloseEvent } from 'websocket';
 
@@ -29,7 +29,7 @@ export function createTranscriber(init: {
   const flushQueue = () => {
     for (const message of dataQueue) {
       if (message === 'DONE') {
-        dgConnection.requestClose();
+        dgConnection.finish();
         break;
       }
       dgConnection.send(message);
@@ -41,7 +41,7 @@ export function createTranscriber(init: {
     dataQueue.push(data);
     if (
       state.isUpstreamInitialized &&
-      dgConnection.getReadyState() === SOCKET_STATES.open
+      dgConnection.getReadyState() === LiveConnectionState.OPEN
     ) {
       flushQueue();
     }
@@ -92,8 +92,8 @@ export function createTranscriber(init: {
     },
     terminate: () => {
       // TODO: This should hard-close the connection
-      if (dgConnection.getReadyState() === SOCKET_STATES.open) {
-        dgConnection.requestClose();
+      if (dgConnection.getReadyState() === LiveConnectionState.OPEN) {
+        dgConnection.finish();
       }
     },
   };
