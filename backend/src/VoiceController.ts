@@ -1,12 +1,19 @@
 import Cartesia from '@cartesia/cartesia-js';
 
 import { CARTESIA_KEY } from './support/constants';
+import { parseMessage } from './support/parseMessage';
 
 const cartesia = new Cartesia({
   apiKey: CARTESIA_KEY,
 });
 
+type State =
+  | { name: 'NONE' }
+  | { name: 'RUNNING' }
+  | { name: 'ERROR'; error: unknown };
+
 export class VoiceController {
+  state: State = { name: 'NONE' };
   inputStream: AsyncIterableIterator<string>;
   contextId: string;
   onChunk: (chunk: Buffer) => void;
@@ -41,15 +48,39 @@ export class VoiceController {
       await websocket.connect();
     } catch (error) {
       onError(error);
+      this.state = { name: 'ERROR', error };
       return;
     }
 
+    const processControlMessage = (rawMessage: string) => {
+      const message = parseMessage(rawMessage);
+      // An error message will look like: { "type": "error", "context_id": "lz3a7odp.140ut555zgv", "status_code": 500, "done": true, "error": "..." }
+      const error =
+        message.type === 'error' ? new Error(String(message.error)) : null;
+      if (error) {
+        onError(error);
+        this.state = { name: 'ERROR', error };
+      }
+      const done =
+        typeof message.done === 'boolean' ? message.done : error !== null;
+      return { error, done };
+    };
+
     const beginStreaming = async (stream: AsyncIterableIterator<string>) => {
       for await (const message of stream) {
+        if (message.startsWith('{')) {
+          const { done } = processControlMessage(message);
+          if (done) {
+            break;
+          } else {
+            continue;
+          }
+        }
         const chunk = Buffer.from(message, 'base64');
         // TODO: Add await?
         onChunk(chunk);
       }
+      // TODO: This will be called even if onError is called above. Is this the correct behavior?
       onDone();
     };
 
@@ -68,6 +99,9 @@ export class VoiceController {
 
     let hasStartedStreaming = false;
     for await (const chunk of inputStream) {
+      if (this.state.name === 'ERROR') {
+        break;
+      }
       const response = send(chunk);
       if (!hasStartedStreaming) {
         void beginStreaming(response.events('message'));

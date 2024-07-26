@@ -40,8 +40,14 @@ export class AgentController {
       onChunk: (chunk) => {
         void outputQueue.write(chunk);
       },
-      onError: (error) => onError(error),
-      onDone: () => onDone(),
+      onError: (error) => {
+        outputQueue.close();
+        onError(error);
+      },
+      onDone: () => {
+        outputQueue.close();
+        onDone();
+      },
     });
     await voiceController.start();
   }
