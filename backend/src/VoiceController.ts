@@ -7,14 +7,14 @@ const cartesia = new Cartesia({
 });
 
 export class VoiceController {
-  inputStream: AsyncIterator<string, undefined>;
+  inputStream: AsyncIterableIterator<string>;
   contextId: string;
   onChunk: (chunk: Buffer) => void;
   onError: (error: unknown) => void;
   onDone: () => void;
 
   constructor(init: {
-    inputStream: AsyncIterator<string, undefined>;
+    inputStream: AsyncIterableIterator<string>;
     contextId: string;
     onChunk: (chunk: Buffer) => void;
     onError: (error: unknown) => void;
@@ -44,21 +44,17 @@ export class VoiceController {
       return;
     }
 
-    let isStreaming = false;
     const beginStreaming = async (stream: AsyncIterableIterator<string>) => {
-      if (!isStreaming) {
-        isStreaming = true;
-        for await (const message of stream) {
-          const chunk = Buffer.from(message, 'base64');
-          // TODO: Add await?
-          onChunk(chunk);
-        }
-        onDone();
+      for await (const message of stream) {
+        const chunk = Buffer.from(message, 'base64');
+        // TODO: Add await?
+        onChunk(chunk);
       }
+      onDone();
     };
 
-    const send = (text: string, isFinal: boolean) => {
-      const response = websocket.send({
+    const send = (text: string, isFinal = false) => {
+      return websocket.send({
         model_id: 'sonic-english',
         voice: {
           mode: 'id',
@@ -68,16 +64,16 @@ export class VoiceController {
         context_id: contextId,
         continue: !isFinal,
       });
-      void beginStreaming(response.events('message'));
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition, no-constant-condition
-    while (true) {
-      const { value, done } = await inputStream.next();
-      send(value ?? '', done ?? false);
-      if (done) {
-        break;
+    let hasStartedStreaming = false;
+    for await (const chunk of inputStream) {
+      const response = send(chunk);
+      if (!hasStartedStreaming) {
+        void beginStreaming(response.events('message'));
+        hasStartedStreaming = true;
       }
     }
+    send('', true);
   }
 }

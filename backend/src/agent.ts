@@ -16,12 +16,12 @@ export async function createAgentResponse(userInput: string) {
     stream: true,
   });
   // eslint-disable-next-line functions/top-level-fn-decl
-  const getAsyncIterator = async function* (): AsyncIterator<
-    string,
-    undefined
-  > {
+  const getAsyncIterator = async function* (): AsyncIterableIterator<string> {
     for await (const chunk of stream) {
-      yield chunk.choices[0]?.delta?.content || '';
+      const content = chunk.choices[0]?.delta?.content;
+      if (content) {
+        yield content;
+      }
     }
   };
   return getAsyncIterator();
