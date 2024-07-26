@@ -3,6 +3,7 @@ import { WebSocketServer } from 'ws';
 import { AgentController } from './AgentController';
 import { createTranscriber } from './deepgram';
 import { createLogger } from './support/Logger';
+import { parseMessage } from './support/parseMessage';
 
 type Transcriber = ReturnType<typeof createTranscriber>;
 
@@ -86,7 +87,7 @@ wss.on('connection', (socket) => {
           const { transcriber } = state.current;
           const { value } = payload;
           if (typeof value === 'string') {
-            const data = Buffer.from(value, 'utf8');
+            const data = Buffer.from(value, 'base64');
             transcriber.send(data);
           }
         }
@@ -142,21 +143,4 @@ function toString(input: Buffer | ArrayBuffer | Array<Buffer>) {
     return Buffer.concat(input).toString('utf8');
   }
   return Buffer.from(input).toString('utf8');
-}
-
-function safeParse(input: string): unknown {
-  try {
-    return JSON.parse(input);
-  } catch {
-    return null;
-  }
-}
-
-function isObject(input: unknown): input is Record<string, unknown> {
-  return input !== null && typeof input === 'object' && !Array.isArray(input);
-}
-
-function parseMessage(input: string): Record<string, unknown> {
-  const value = safeParse(input);
-  return isObject(value) ? value : { value };
 }
