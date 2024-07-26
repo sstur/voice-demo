@@ -173,13 +173,16 @@ class ListeningController {
 
   private async sendStream(readableStream: AsyncGenerator<string, undefined>) {
     const { socket } = this;
+    // TODO: Use for..await
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition, no-constant-condition
     while (true) {
       const { value, done } = await readableStream.next();
+      if (value) {
+        await socket.send({ type: 'AUDIO_CHUNK', value });
+      }
       if (done) {
         break;
       }
-      await socket.send({ type: 'AUDIO_CHUNK', value });
     }
     await socket.send({ type: 'AUDIO_DONE' });
   }
@@ -220,6 +223,7 @@ class PlaybackController {
       this.onError(errorMessage);
       return;
     }
+    // TODO: Change state; enable cancel button in UI
     const playbackUrl = String(message.playbackUrl);
     console.log({ playbackUrl });
     // TODO: Setup playback
