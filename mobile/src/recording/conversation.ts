@@ -135,6 +135,7 @@ class ListeningController {
     const abortController = new AbortController();
     void this.socket
       .waitForMessageOfType('STOP_UPLOAD_STREAM', {
+        timeout: 0,
         signal: abortController.signal,
       })
       .then(() => {
