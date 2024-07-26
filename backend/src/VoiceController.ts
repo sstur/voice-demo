@@ -75,6 +75,9 @@ export class VoiceController {
     while (true) {
       const { value, done } = await inputStream.next();
       send(value ?? '', done ?? false);
+      if (done) {
+        break;
+      }
     }
   }
 }
