@@ -1,4 +1,5 @@
 import { safeInvoke } from '../support/safeInvoke';
+import { sleep } from '../support/sleep';
 import { startRecording, stopRecording } from './Recording';
 import { Socket } from './socket';
 
@@ -210,14 +211,27 @@ class PlaybackController {
     this.onDone = onDone;
   }
 
+  // TODO: We should not use polling like this with WebSockets
+  private async waitForReady() {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition, no-constant-condition
+    while (true) {
+      void this.socket.send({ type: 'START_PLAYBACK' });
+      const message = await this.socket.waitForMessageOfType(
+        'START_PLAYBACK_RESULT',
+      );
+      if (message.status === 'TRY_AGAIN') {
+        await sleep(100);
+        continue;
+      }
+      return message;
+    }
+  }
+
   async start() {
     this.state = { name: 'INITIALIZING' };
-    void this.socket.send({ type: 'START_PLAYBACK' });
-    // { type: 'START_PLAYBACK_RESULT', success: true, playbackUrl: string } | { type: 'START_PLAYBACK_RESULT', success: false, error: string }
-    const message = await this.socket.waitForMessageOfType(
-      'START_PLAYBACK_RESULT',
-    );
-    if (!message.success) {
+    // { type: 'START_PLAYBACK_RESULT', status: 'TRY_AGAIN' } | { type: 'START_PLAYBACK_RESULT', status: 'READY', playbackUrl: string } | { type: 'START_PLAYBACK_RESULT', status: 'ERROR', error: string }
+    const message = await this.waitForReady();
+    if (message.status === 'ERROR') {
       const errorMessage = String(message.error);
       this.state = { name: 'ERROR', error: errorMessage };
       this.onError(errorMessage);

@@ -103,13 +103,27 @@ wss.on('connection', (socket) => {
       }
       case 'START_PLAYBACK': {
         const currentState = state.current;
-        if (currentState.name === 'AGENT_WORKING') {
-          const { agentController } = currentState;
-          const playbackUrl = agentController.getOutputUrl();
-          send({ type: 'START_PLAYBACK_RESULT', success: true, playbackUrl });
-        } else {
-          const error = `Unable to start playback in state ${currentState.name}`;
-          send({ type: 'START_PLAYBACK_RESULT', success: false, error });
+        switch (currentState.name) {
+          case 'FINALIZING_TRANSCRIPTION': {
+            send({ type: 'START_PLAYBACK_RESULT', status: 'TRY_AGAIN' });
+            break;
+          }
+          case 'AGENT_WORKING': {
+            const { agentController } = currentState;
+            const playbackUrl = agentController.getOutputUrl();
+            send({
+              type: 'START_PLAYBACK_RESULT',
+              status: 'READY',
+              playbackUrl,
+            });
+            break;
+          }
+          default: {
+            const error = `Unable to start playback in state ${currentState.name}`;
+            // eslint-disable-next-line no-console
+            console.warn(error);
+            send({ type: 'START_PLAYBACK_RESULT', status: 'ERROR', error });
+          }
         }
         break;
       }
