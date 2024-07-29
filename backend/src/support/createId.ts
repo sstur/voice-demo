@@ -1,5 +1,5 @@
+import { v4 as uuidv4 } from 'uuid';
+
 export function createId() {
-  const datePart = Date.now();
-  const randomPart = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
-  return datePart.toString(36) + '.' + randomPart.toString(36);
+  return uuidv4();
 }
