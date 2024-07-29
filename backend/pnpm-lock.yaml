@@ -23,6 +23,9 @@ dependencies:
   runtypes:
     specifier: ^6.7.0
     version: 6.7.0
+  uuid:
+    specifier: ^10.0.0
+    version: 10.0.0
   ws:
     specifier: ^8.18.0
     version: 8.18.0
@@ -34,6 +37,9 @@ devDependencies:
   '@types/node':
     specifier: ^20.14.10
     version: 20.14.10
+  '@types/uuid':
+    specifier: ^10.0.0
+    version: 10.0.0
   '@types/ws':
     specifier: ^8.5.11
     version: 8.5.11
@@ -508,6 +514,10 @@ packages:
 
   /@types/strip-json-comments@0.0.30:
     resolution: {integrity: sha512-7NQmHra/JILCd1QqpSzl8+mJRc8ZHz3uDm8YV1Ks9IhK0epEiTw8aIErbvH9PI+6XbqhyIQy3462nEsn7UVzjQ==}
+    dev: true
+
+  /@types/uuid@10.0.0:
+    resolution: {integrity: sha512-7gqG38EyHgyP1S+7+xomFtL+ZNHcKv6DwNaCZmJmo1vgMugyF3TCnXVg4t1uk89mLNwnLtnY3TpOpCOyp1/xHQ==}
     dev: true
 
   /@types/websocket@1.0.10:
@@ -2723,6 +2733,11 @@ packages:
     requiresBuild: true
     dependencies:
       node-gyp-build: 4.8.1
+    dev: false
+
+  /uuid@10.0.0:
+    resolution: {integrity: sha512-8XkAphELsDnEGrDxUOHB3RGvXz6TeuYSGEZBOjtTtPm2lwhGBjLgOzLHB63IUWfBpNucQjND6d3AOudO+H3RWQ==}
+    hasBin: true
     dev: false
 
   /v8-compile-cache-lib@3.0.1:
