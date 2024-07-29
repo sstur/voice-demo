@@ -10,7 +10,7 @@ export async function playbackHandler(request: Request): Promise<Response> {
   }
   return new Response(asyncQueue, {
     headers: {
-      'content-type': 'audio/wav',
+      'content-type': 'audio/pcm',
     },
   });
 }

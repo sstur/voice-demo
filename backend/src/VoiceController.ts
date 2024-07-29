@@ -39,7 +39,7 @@ export class VoiceController {
     const { inputStream, contextId, onChunk, onError, onDone } = this;
 
     const websocket = cartesia.tts.websocket({
-      container: 'wav',
+      container: 'raw',
       encoding: 'pcm_s16le',
       sampleRate: 44100,
     });
@@ -52,33 +52,34 @@ export class VoiceController {
       return;
     }
 
-    const processControlMessage = (rawMessage: string) => {
-      const message = parseMessage(rawMessage);
-      // An error message will look like: { "type": "error", "context_id": "lz3a7odp.140ut555zgv", "status_code": 500, "done": true, "error": "..." }
-      const error =
-        message.type === 'error' ? new Error(String(message.error)) : null;
-      if (error) {
-        onError(error);
-        this.state = { name: 'ERROR', error };
-      }
-      const done =
-        typeof message.done === 'boolean' ? message.done : error !== null;
-      return { error, done };
-    };
-
     const beginStreaming = async (stream: AsyncIterableIterator<string>) => {
-      for await (const message of stream) {
-        if (message.startsWith('{')) {
-          const { done } = processControlMessage(message);
-          if (done) {
+      for await (const rawMessage of stream) {
+        const message = parseMessage(rawMessage);
+        switch (message.type) {
+          // An error message will look like: { "type": "error", "context_id": "...", "status_code": 500, "done": true, "error": "..." }
+          case 'error': {
+            const error = new Error(String(message.error));
+            onError(error);
+            this.state = { name: 'ERROR', error };
             break;
-          } else {
-            continue;
+          }
+          // A data chunk will look like: { "type": "chunk", "context_id": "...", "status_code": 206, "done": false, "data": "....", "step_time": 55.578796 }
+          case 'chunk': {
+            const chunk = Buffer.from(String(message.data), 'base64');
+            // TODO: Add await?
+            onChunk(chunk);
+            break;
+          }
+          // A done message will look like: { "type": "done", "context_id": "...", "status_code": 200, "done": true }
+          default: {
+            //
           }
         }
-        const chunk = Buffer.from(message, 'base64');
-        // TODO: Add await?
-        onChunk(chunk);
+        if (message.done) {
+          break;
+        } else {
+          continue;
+        }
       }
       // TODO: This will be called even if onError is called above. Is this the correct behavior?
       onDone();
