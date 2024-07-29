@@ -1,7 +1,12 @@
+import { spawn } from 'child_process';
+
 import Cartesia from '@cartesia/cartesia-js';
 
 import { CARTESIA_KEY } from './support/constants';
 import { parseMessage } from './support/parseMessage';
+
+// Keep this in sync with the ffmpeg output settings below
+export const OUTPUT_FORMAT_CONTENT_TYPE = 'audio/mpa';
 
 const cartesia = new Cartesia({
   apiKey: CARTESIA_KEY,
@@ -38,6 +43,36 @@ export class VoiceController {
   async start() {
     const { inputStream, contextId, onChunk, onError, onDone } = this;
 
+    const ffmpeg = spawn(
+      'ffmpeg',
+      [
+        ['-f', 's16le'],
+        ['-ar', '44100'],
+        ['-ac', '1'],
+        ['-i', '-'],
+        ['-c:a', 'mp3'],
+        ['-f', 'mpegts'],
+        '-',
+      ].flat(),
+    );
+
+    ffmpeg.stdout.on('data', (chunk: Buffer) => {
+      onChunk(chunk);
+    });
+
+    ffmpeg.stdout.on('error', (error) => {
+      onError(error);
+      this.state = { name: 'ERROR', error };
+    });
+
+    ffmpeg.on('close', (code) => {
+      if (code !== 0) {
+        // eslint-disable-next-line no-console
+        console.warn(`FFmpeg process exited with code ${code}`);
+      }
+      onDone();
+    });
+
     const websocket = cartesia.tts.websocket({
       container: 'raw',
       encoding: 'pcm_s16le',
@@ -54,6 +89,9 @@ export class VoiceController {
 
     const beginStreaming = async (stream: AsyncIterableIterator<string>) => {
       for await (const rawMessage of stream) {
+        if (this.state.name === 'ERROR') {
+          break;
+        }
         const message = parseMessage(rawMessage);
         switch (message.type) {
           // An error message will look like: { "type": "error", "context_id": "...", "status_code": 500, "done": true, "error": "..." }
@@ -61,18 +99,22 @@ export class VoiceController {
             const error = new Error(String(message.error));
             onError(error);
             this.state = { name: 'ERROR', error };
+            ffmpeg.kill();
             break;
           }
           // A data chunk will look like: { "type": "chunk", "context_id": "...", "status_code": 206, "done": false, "data": "....", "step_time": 55.578796 }
           case 'chunk': {
             const chunk = Buffer.from(String(message.data), 'base64');
-            // TODO: Add await?
-            onChunk(chunk);
+            ffmpeg.stdin.write(chunk);
             break;
           }
           // A done message will look like: { "type": "done", "context_id": "...", "status_code": 200, "done": true }
+          case 'done': {
+            break;
+          }
           default: {
-            //
+            // eslint-disable-next-line no-console
+            console.warn('Unhandled message received from Cartesia:', message);
           }
         }
         if (message.done) {
@@ -81,8 +123,9 @@ export class VoiceController {
           continue;
         }
       }
-      // TODO: This will be called even if onError is called above. Is this the correct behavior?
-      onDone();
+      if (this.state.name !== 'ERROR') {
+        ffmpeg.stdin.end();
+      }
     };
 
     const send = (text: string, isFinal = false) => {
