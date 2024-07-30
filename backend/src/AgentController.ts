@@ -1,5 +1,5 @@
 import { createAgentResponse } from './agent';
-import { AsyncQueue } from './support/AsyncQueue';
+import type { AsyncQueue } from './support/AsyncQueue';
 import { createId } from './support/createId';
 import { VoiceController } from './VoiceController';
 import { voiceResponseStore } from './voiceResponseStore';
@@ -20,13 +20,7 @@ export class AgentController {
     const { userInput, onError, onDone } = init;
     this.userInput = userInput;
     const contextId = (this.contextId = createId());
-    const outputQueue = new AsyncQueue<Buffer>({
-      onConsumed: () => {
-        voiceResponseStore.delete(contextId);
-      },
-    });
-    this.outputQueue = outputQueue;
-    voiceResponseStore.set(contextId, outputQueue);
+    this.outputQueue = voiceResponseStore.create(contextId);
     this.onError = onError;
     this.onDone = onDone;
   }
