@@ -242,7 +242,6 @@ class PlaybackController {
     // TODO: Change state; enable cancel button in UI
     const playbackUrl = String(message.playbackUrl);
     const _sound = await playSound({
-      // uri: 'http://192.168.86.22:64517/audio.aac',
       uri: API_BASE_URL + playbackUrl,
       onDone: () => {
         console.log('Done playback.');
