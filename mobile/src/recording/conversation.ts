@@ -1,5 +1,7 @@
+import { API_BASE_URL } from '../support/constants';
 import { safeInvoke } from '../support/safeInvoke';
 import { sleep } from '../support/sleep';
+import { playSound } from './playSound';
 import { startRecording, stopRecording } from './Recording';
 import { Socket } from './socket';
 
@@ -239,8 +241,14 @@ class PlaybackController {
     }
     // TODO: Change state; enable cancel button in UI
     const playbackUrl = String(message.playbackUrl);
-    console.log({ playbackUrl });
-    // TODO: Setup playback
-    // TODO: When done playing, invoke onDone() so ConversationController can go back to USER_SPEAKING
+    const _sound = await playSound({
+      // uri: 'http://192.168.86.22:64517/audio.aac',
+      uri: API_BASE_URL + playbackUrl,
+      onDone: () => {
+        console.log('Done playback.');
+        // TODO: Uncomment this to go back to user speaking
+        // this.onDone();
+      },
+    });
   }
 }

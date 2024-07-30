@@ -5,8 +5,9 @@ import Cartesia from '@cartesia/cartesia-js';
 import { CARTESIA_KEY } from './support/constants';
 import { parseMessage } from './support/parseMessage';
 
-// Keep this in sync with the ffmpeg output settings below
-export const OUTPUT_FORMAT_CONTENT_TYPE = 'audio/mpa';
+// Keep these in sync with the ffmpeg output settings below
+export const OUTPUT_FORMAT_CONTENT_TYPE = 'audio/aac';
+export const OUTPUT_FILE_NAME = 'audio.aac';
 
 const cartesia = new Cartesia({
   apiKey: CARTESIA_KEY,
@@ -50,8 +51,8 @@ export class VoiceController {
         ['-ar', '44100'],
         ['-ac', '1'],
         ['-i', '-'],
-        ['-c:a', 'mp3'],
-        ['-f', 'mpegts'],
+        ['-c:a', 'aac'],
+        ['-f', 'adts'],
         '-',
       ].flat(),
     );

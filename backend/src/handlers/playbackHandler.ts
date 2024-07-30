@@ -1,4 +1,7 @@
-import { OUTPUT_FORMAT_CONTENT_TYPE } from '../VoiceController';
+import {
+  OUTPUT_FILE_NAME,
+  OUTPUT_FORMAT_CONTENT_TYPE,
+} from '../VoiceController';
 import { voiceResponseStore } from '../voiceResponseStore';
 
 // eslint-disable-next-line @typescript-eslint/require-await
@@ -11,7 +14,8 @@ export async function playbackHandler(request: Request): Promise<Response> {
   }
   return new Response(asyncQueue, {
     headers: {
-      'content-type': OUTPUT_FORMAT_CONTENT_TYPE,
+      'Content-Type': OUTPUT_FORMAT_CONTENT_TYPE,
+      'Content-Disposition': `inline; filename="${OUTPUT_FILE_NAME}"`,
     },
   });
 }
