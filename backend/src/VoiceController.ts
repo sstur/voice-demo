@@ -151,16 +151,32 @@ export class VoiceController {
     };
 
     let hasStartedStreaming = false;
-    for await (const chunk of inputStream) {
+    const tokens: Array<string> = [];
+    for await (const token of inputStream) {
       if (this.state.name === 'ERROR') {
         break;
       }
-      const response = send(chunk);
-      if (!hasStartedStreaming) {
-        void beginStreaming(response.events('message'));
-        hasStartedStreaming = true;
+      tokens.push(token);
+      // Accumulate a few tokens before sending.
+      if (tokens.length > 4) {
+        const joined = tokens.join('');
+        tokens.length = 0;
+        const text = joined.replace(
+          /(\s*)(\S+)$/,
+          (_, space: string, token: string) => {
+            tokens.push(token);
+            return space;
+          },
+        );
+        if (text) {
+          const response = send(text);
+          if (!hasStartedStreaming) {
+            void beginStreaming(response.events('message'));
+            hasStartedStreaming = true;
+          }
+        }
       }
     }
-    send('', true);
+    send(tokens.join(''), true);
   }
 }
