@@ -44,8 +44,10 @@ export function createTranscriber(init: {
     },
   });
 
+  const startTime = Date.now();
   connection.on('open', () => {
-    logger.log('Deepgram connection opened.');
+    const timeElapsed = Date.now() - startTime;
+    logger.log(`Deepgram connection opened in ${timeElapsed}ms`);
     flushQueue();
   });
 
