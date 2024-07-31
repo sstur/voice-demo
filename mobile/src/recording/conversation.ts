@@ -151,6 +151,7 @@ class ListeningController {
       this.onError(errorMessage);
       return;
     }
+    console.log('>> Started listening...');
     this.state = { name: 'LISTENING' };
     const readableStream = result.result;
     this.sendStream(readableStream)

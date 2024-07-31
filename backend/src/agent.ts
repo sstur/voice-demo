@@ -19,6 +19,7 @@ You will use your best judgement to determine what the user meant, even if it is
 `.trim();
 
 export async function createAgentResponse(userInput: string) {
+  const startTime = Date.now();
   const stream = await openai.chat.completions.create({
     model: 'gpt-4o',
     messages: [
@@ -35,9 +36,15 @@ export async function createAgentResponse(userInput: string) {
   });
   // eslint-disable-next-line functions/top-level-fn-decl
   const getAsyncIterator = async function* (): AsyncIterableIterator<string> {
+    let hasStarted = false;
     for await (const chunk of stream) {
       const content = chunk.choices[0]?.delta?.content;
       if (content) {
+        if (!hasStarted) {
+          const timeElapsed = Date.now() - startTime;
+          console.log('>> Time to first token:', timeElapsed);
+          hasStarted = true;
+        }
         yield content;
       }
     }

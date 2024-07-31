@@ -74,6 +74,7 @@ export class VoiceController {
       onDone();
     });
 
+    const startTime = Date.now();
     const websocket = cartesia.tts.websocket({
       container: 'raw',
       encoding: 'pcm_s16le',
@@ -89,6 +90,7 @@ export class VoiceController {
     }
 
     const beginStreaming = async (stream: AsyncIterableIterator<string>) => {
+      let hasStarted = false;
       for await (const rawMessage of stream) {
         if (this.state.name === 'ERROR') {
           break;
@@ -105,6 +107,11 @@ export class VoiceController {
           }
           // A data chunk will look like: { "type": "chunk", "context_id": "...", "status_code": 206, "done": false, "data": "....", "step_time": 55.578796 }
           case 'chunk': {
+            if (!hasStarted) {
+              const timeElapsed = Date.now() - startTime;
+              console.log('>> Time to first audio chunk:', timeElapsed);
+              hasStarted = true;
+            }
             const chunk = Buffer.from(String(message.data), 'base64');
             ffmpeg.stdin.write(chunk);
             break;
@@ -130,6 +137,7 @@ export class VoiceController {
     };
 
     const send = (text: string, isFinal = false) => {
+      console.log('Sending to Cartesia:', JSON.stringify(text));
       return websocket.send({
         model_id: 'sonic-english',
         voice: {
