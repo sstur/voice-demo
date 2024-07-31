@@ -41,13 +41,11 @@ wss.on('connection', (socket) => {
     const payload = parseMessage(toString(data));
     switch (payload.type) {
       case 'START_UPLOAD_STREAM': {
-        const chunks: Array<string> = [];
+        const textFragments: Array<string> = [];
         const transcriber = createTranscriber({
           logger,
-          onText: (text, { isFinal }) => {
-            if (isFinal) {
-              chunks.push(text);
-            }
+          onText: (text) => {
+            textFragments.push(text);
           },
           onError: (_error) => {
             // TODO
@@ -60,7 +58,7 @@ wss.on('connection', (socket) => {
             // telling it to, also invoking this code path. In this case we want
             // to tell the frontend to stop the recording.
             send({ type: 'STOP_UPLOAD_STREAM' });
-            const result = chunks.join('');
+            const result = textFragments.join(' ');
             logger.log({ transcriptionResult: result });
             // TODO: If result is empty, what should we do?
             const agentController = new AgentController({

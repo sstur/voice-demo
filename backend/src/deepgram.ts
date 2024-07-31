@@ -1,111 +1,123 @@
-import type { LiveTranscriptionEvent } from '@deepgram/sdk';
-import {
-  createClient,
-  LiveConnectionState,
-  LiveTranscriptionEvents,
-} from '@deepgram/sdk';
-import type { ICloseEvent } from 'websocket';
+import { WebSocket } from 'ws';
 
-import { DEEPGRAM_KEY } from './support/constants';
+import { DEEPGRAM_KEY, DEEPGRAM_WSS_URL } from './support/constants';
 import type { Logger } from './support/Logger';
-
-const deepgram = createClient(DEEPGRAM_KEY);
+import { parseMessage } from './support/parseMessage';
 
 // TODO: Proper state
 export function createTranscriber(init: {
   logger: Logger;
-  onText: (text: string, details: { isFinal: boolean }) => void;
-  onError: (error: unknown) => void;
-  onClose: (event: ICloseEvent) => void;
+  onText: (text: string) => void;
+  onError: (error: Error) => void;
+  onClose: (event: { code: number; reason: string }) => void;
 }) {
   const { logger, onText, onError, onClose } = init;
 
-  const state = {
-    isUpstreamInitialized: false,
-  };
-
-  const dataQueue: Array<Buffer | 'DONE'> = [];
+  const textFragments: Array<string> = [];
+  const dataQueue: Array<Buffer | Record<string, unknown>> = [];
 
   const flushQueue = () => {
     for (const message of dataQueue) {
-      if (message === 'DONE') {
-        dgConnection.finish();
-        break;
+      if (Buffer.isBuffer(message)) {
+        connection.send(message);
+      } else {
+        connection.send(JSON.stringify(message));
       }
-      dgConnection.send(message);
     }
     dataQueue.length = 0;
   };
 
-  const send = (data: Buffer | 'DONE') => {
+  const send = (data: Buffer | Record<string, unknown>) => {
     dataQueue.push(data);
-    if (
-      state.isUpstreamInitialized &&
-      dgConnection.getReadyState() === LiveConnectionState.OPEN
-    ) {
+    if (connection.readyState === WebSocket.OPEN) {
       flushQueue();
+    } else if (Buffer.isBuffer(data)) {
+      logger.debug('>> Audio chunk queued.');
     }
   };
 
-  const dgConnection = deepgram.listen.live({
-    interim_results: true,
-    model: 'nova-2-conversationalai',
-    smart_format: true,
+  const url = new URL(DEEPGRAM_WSS_URL);
+  url.searchParams.set('model', 'nova-2-conversationalai');
+  const connection = new WebSocket(url, undefined, {
+    headers: {
+      Authorization: `Token ${DEEPGRAM_KEY}`,
+    },
   });
 
-  dgConnection.on('open', () => {
-    logger.log('Deepgram open');
-    state.isUpstreamInitialized = true;
+  connection.on('open', () => {
+    logger.log('Deepgram connection opened.');
     flushQueue();
   });
 
-  dgConnection.on('close', (event: ICloseEvent) => {
-    const { code, reason, wasClean } = event;
-    logger.log('Deepgram closed', { code, reason, wasClean });
-    onClose(event);
-  });
-
-  dgConnection.on('error', (event) => {
-    logger.warn('dgConnection received error:', toError(event));
-    onError(event);
-  });
-
-  dgConnection.on(
-    LiveTranscriptionEvents.Transcript,
-    (data: LiveTranscriptionEvent) => {
-      const isFinal = data.is_final ?? false;
-      for (const { transcript } of data.channel.alternatives) {
-        if (typeof transcript === 'string') {
-          const text = transcript.trim();
-          onText(text, { isFinal });
+  connection.on('message', (rawMessage, _isBinary) => {
+    const message = parseMessage(toString(rawMessage));
+    switch (message.type) {
+      case 'Results': {
+        // Should look like: { "type": "Results", "channel_index": [0, 1], "duration": 0.061875343, "start": 7.74, "is_final": true, "speech_final": false, "channel": { "alternatives": [{ "transcript": "...", "confidence": 1, "words": [{ "word": "foo", "start": 1.72, "end": 1.96, "confidence": 0.9970703 }] }] }, "metadata": { "request_id": "...", "model_uuid": "...", "model_info": { ... } }, "from_finalize": false }
+        const channel = Object(message.channel);
+        for (const alt of toArray(channel.alternatives)) {
+          const transcript = Object(alt).transcript;
+          if (typeof transcript === 'string') {
+            // I actually don't believe this is necessary, it comes already trimmed
+            const text = transcript.trim();
+            logger.log({ text });
+            if (text) {
+              onText(text);
+              textFragments.push(text);
+            }
+            // TODO: Find a better way to detect pause
+            if (textFragments.length && text === '') {
+              send({ type: 'CloseStream' });
+            }
+          }
         }
+        break;
       }
-    },
-  );
+      case 'Metadata': {
+        // Should look like: { "type": "Metadata", "transaction_key": "deprecated", "request_id": "...", "sha256": "...", "created": "2024-07-30T20:31:13.685Z", "duration": 7.801875, "channels": 1, "models": [...], "model_info": { ... } }
+        break;
+      }
+      default: {
+        logger.warn('Unrecognized Deepgram message:', message);
+      }
+    }
+  });
+
+  connection.on('close', (code, reasonRaw) => {
+    const reason = toString(reasonRaw);
+    logger.log('Deepgram connection closed:', { code, reason });
+    onClose({ code, reason });
+  });
+
+  connection.on('error', (error) => {
+    logger.warn('Deepgram connection experienced an error:', error);
+    // TODO: Clean up?
+    onError(error);
+  });
 
   return {
     send: (data: Buffer) => {
       send(data);
     },
     done: () => {
-      send('DONE');
+      send({ type: 'CloseStream' });
     },
     terminate: () => {
-      // TODO: This should hard-close the connection
-      if (dgConnection.getReadyState() === LiveConnectionState.OPEN) {
-        dgConnection.finish();
-      }
+      connection.terminate();
     },
   };
 }
 
-/**
- * The parameter sent to the onError handler for Deepgram can be any value, but is likely a ErrorEvent.
- */
-function toError(input: unknown): Error {
-  const object = Object(input);
-  if (object.__proto__?.constructor.name === 'ErrorEvent') {
-    return toError(object.error);
+function toString(input: Buffer | ArrayBuffer | Array<Buffer>) {
+  if (Buffer.isBuffer(input)) {
+    return input.toString('utf8');
   }
-  return input instanceof Error ? input : new Error(String(input));
+  if (Array.isArray(input)) {
+    return Buffer.concat(input).toString('utf8');
+  }
+  return Buffer.from(input).toString('utf8');
+}
+
+function toArray(input: unknown): Array<unknown> {
+  return Array.isArray(input) ? input : [];
 }
