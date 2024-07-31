@@ -50,16 +50,15 @@ wss.on('connection', (socket) => {
           onError: (_error) => {
             // TODO
           },
-          onClose: ({ code }) => {
-            const _isSuccess = code === 1000;
-            // Normal flow would be frontend sends AUDIO_DONE and we call
+          onDone: () => {
+            // One potential flow is frontend sends AUDIO_DONE and we call
             // transcriber.done() which invokes this code path here.
-            // However, in some cases Deepgram can close the socket without us
-            // telling it to, also invoking this code path. In this case we want
-            // to tell the frontend to stop the recording.
+            // Alternatively if Deepgram identifies a period of silence it will
+            // invoke this code path and we need to tell the frontend to stop
+            // the recording.
             send({ type: 'STOP_UPLOAD_STREAM' });
             const result = textFragments.join(' ');
-            logger.log({ transcriptionResult: result });
+            logger.log('Transcription complete:', JSON.stringify(result));
             // TODO: If result is empty, what should we do?
             const agentController = new AgentController({
               userInput: result,

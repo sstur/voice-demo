@@ -2,6 +2,7 @@ import { WebSocket } from 'ws';
 
 import { DEEPGRAM_KEY, DEEPGRAM_WSS_URL } from './support/constants';
 import type { Logger } from './support/Logger';
+import { once } from './support/once';
 import { parseMessage } from './support/parseMessage';
 
 // TODO: Proper state
@@ -9,9 +10,11 @@ export function createTranscriber(init: {
   logger: Logger;
   onText: (text: string) => void;
   onError: (error: Error) => void;
-  onClose: (event: { code: number; reason: string }) => void;
+  onDone: () => void;
 }) {
-  const { logger, onText, onError, onClose } = init;
+  const { logger, onText } = init;
+  const onDone = once(init.onDone);
+  const onError = once(init.onError);
 
   const textFragments: Array<string> = [];
   const dataQueue: Array<Buffer | Record<string, unknown>> = [];
@@ -57,21 +60,21 @@ export function createTranscriber(init: {
       case 'Results': {
         // Should look like: { "type": "Results", "channel_index": [0, 1], "duration": 0.061875343, "start": 7.74, "is_final": true, "speech_final": false, "channel": { "alternatives": [{ "transcript": "...", "confidence": 1, "words": [{ "word": "foo", "start": 1.72, "end": 1.96, "confidence": 0.9970703 }] }] }, "metadata": { "request_id": "...", "model_uuid": "...", "model_info": { ... } }, "from_finalize": false }
         const channel = Object(message.channel);
-        for (const alt of toArray(channel.alternatives)) {
-          const transcript = Object(alt).transcript;
-          if (typeof transcript === 'string') {
-            // I actually don't believe this is necessary, it comes already trimmed
-            const text = transcript.trim();
-            logger.log({ text });
-            if (text) {
-              onText(text);
-              textFragments.push(text);
-            }
-            // TODO: Find a better way to detect pause
-            if (textFragments.length && text === '') {
-              send({ type: 'CloseStream' });
-            }
-          }
+        const result = Object(toArray(channel.alternatives)[0]);
+        const transcript = String(result.transcript ?? '');
+        // I actually don't believe this is necessary, it comes already trimmed
+        const text = transcript.trim();
+        const hasStartedSpeaking = textFragments.length > 0;
+        // TODO: Find a better way to detect pause?
+        if (text === '' && hasStartedSpeaking) {
+          onDone();
+          connection.terminate();
+          break;
+        }
+        logger.log({ text });
+        if (text) {
+          onText(text);
+          textFragments.push(text);
         }
         break;
       }
@@ -88,7 +91,7 @@ export function createTranscriber(init: {
   connection.on('close', (code, reasonRaw) => {
     const reason = toString(reasonRaw);
     logger.log('Deepgram connection closed:', { code, reason });
-    onClose({ code, reason });
+    onDone();
   });
 
   connection.on('error', (error) => {
