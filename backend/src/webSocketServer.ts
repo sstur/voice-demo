@@ -41,17 +41,16 @@ wss.on('connection', (socket) => {
     switch (payload.type) {
       case 'START_UPLOAD_STREAM': {
         const transcriber = deepgramPool.get();
-        const textFragments: Array<string> = [];
-        readStream(transcriber, textFragments)
-          .then(() => {
+        readEntireStream(transcriber)
+          .then((textFragments) => {
+            // TODO: If result is empty, what should we do?
+            const result = textFragments.join(' ');
             // One potential flow is frontend sends AUDIO_DONE and we call
             // transcriber.done() which invokes this code path here.
             // Alternatively if Deepgram identifies a period of silence it will
             // invoke this code path and we need to tell the frontend to stop
             // the recording.
             send({ type: 'STOP_UPLOAD_STREAM' });
-            // TODO: If result is empty, what should we do?
-            const result = textFragments.join(' ');
             logger.log('Transcription complete:', JSON.stringify(result));
             const agentController = new AgentController({
               userInput: result,
@@ -151,11 +150,10 @@ function toString(input: Buffer | ArrayBuffer | Array<Buffer>) {
   return Buffer.from(input).toString('utf8');
 }
 
-async function readStream(
-  readable: AsyncIterable<string>,
-  results: Array<string>,
-) {
+async function readEntireStream<T>(readable: AsyncIterable<T>) {
+  const results: Array<T> = [];
   for await (const chunk of readable) {
     results.push(chunk);
   }
+  return results;
 }
