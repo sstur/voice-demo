@@ -45,7 +45,7 @@ export class AsyncQueue<T> implements AsyncIterable<T> {
 
   [Symbol.asyncIterator]() {
     let index = 0;
-    const iterator = {
+    const iterator: AsyncIterableIterator<T> = {
       next: async (): Promise<IteratorResult<T, undefined>> => {
         return await this.read(index++);
       },

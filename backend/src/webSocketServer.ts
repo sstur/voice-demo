@@ -1,15 +1,14 @@
 import { WebSocketServer } from 'ws';
 
 import { AgentController } from './AgentController';
-import { createTranscriber } from './deepgram';
+import type { DeepgramConnection } from './support/DeepgramConnection';
+import { DeepgramPool } from './support/DeepgramPool';
 import { logger } from './support/Logger';
 import { parseMessage } from './support/parseMessage';
 
-type Transcriber = ReturnType<typeof createTranscriber>;
-
 type ConversationState =
   | { name: 'IDLE' }
-  | { name: 'RECEIVING_AUDIO'; transcriber: Transcriber }
+  | { name: 'RECEIVING_AUDIO'; transcriber: DeepgramConnection }
   | { name: 'FINALIZING_TRANSCRIPTION' }
   | { name: 'AGENT_WORKING'; agentController: AgentController }
   | { name: 'AGENT_DONE' }
@@ -17,6 +16,8 @@ type ConversationState =
   | { name: 'ERROR'; error: unknown };
 
 type Ref<T> = { current: T };
+
+const deepgramPool = new DeepgramPool();
 
 export const wss = new WebSocketServer({
   noServer: true,
@@ -39,24 +40,19 @@ wss.on('connection', (socket) => {
     const payload = parseMessage(toString(data));
     switch (payload.type) {
       case 'START_UPLOAD_STREAM': {
+        const transcriber = deepgramPool.get();
         const textFragments: Array<string> = [];
-        const transcriber = createTranscriber({
-          onText: (text) => {
-            textFragments.push(text);
-          },
-          onError: (_error) => {
-            // TODO
-          },
-          onDone: () => {
+        readStream(transcriber, textFragments)
+          .then(() => {
             // One potential flow is frontend sends AUDIO_DONE and we call
             // transcriber.done() which invokes this code path here.
             // Alternatively if Deepgram identifies a period of silence it will
             // invoke this code path and we need to tell the frontend to stop
             // the recording.
             send({ type: 'STOP_UPLOAD_STREAM' });
+            // TODO: If result is empty, what should we do?
             const result = textFragments.join(' ');
             logger.log('Transcription complete:', JSON.stringify(result));
-            // TODO: If result is empty, what should we do?
             const agentController = new AgentController({
               userInput: result,
               onError: (error) => {
@@ -70,8 +66,10 @@ wss.on('connection', (socket) => {
             });
             state.current = { name: 'AGENT_WORKING', agentController };
             void agentController.start();
-          },
-        });
+          })
+          .catch((_error: unknown) => {
+            // TODO
+          });
         state.current = { name: 'RECEIVING_AUDIO', transcriber };
         send({ type: 'START_UPLOAD_STREAM_RESULT', success: true });
         break;
@@ -151,4 +149,13 @@ function toString(input: Buffer | ArrayBuffer | Array<Buffer>) {
     return Buffer.concat(input).toString('utf8');
   }
   return Buffer.from(input).toString('utf8');
+}
+
+async function readStream(
+  readable: AsyncIterable<string>,
+  results: Array<string>,
+) {
+  for await (const chunk of readable) {
+    results.push(chunk);
+  }
 }
