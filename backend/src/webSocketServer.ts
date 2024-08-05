@@ -2,7 +2,7 @@ import { WebSocketServer } from 'ws';
 
 import { AgentController } from './AgentController';
 import { createTranscriber } from './deepgram';
-import { createLogger } from './support/Logger';
+import { logger } from './support/Logger';
 import { parseMessage } from './support/parseMessage';
 
 type Transcriber = ReturnType<typeof createTranscriber>;
@@ -25,8 +25,6 @@ export const wss = new WebSocketServer({
 });
 
 wss.on('connection', (socket) => {
-  const logger = createLogger({ level: 'DEBUG' });
-
   const state: Ref<ConversationState> = { current: { name: 'IDLE' } };
 
   const send = (message: Record<string, unknown>) => {
@@ -43,7 +41,6 @@ wss.on('connection', (socket) => {
       case 'START_UPLOAD_STREAM': {
         const textFragments: Array<string> = [];
         const transcriber = createTranscriber({
-          logger,
           onText: (text) => {
             textFragments.push(text);
           },

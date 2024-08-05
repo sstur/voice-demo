@@ -40,4 +40,5 @@ declare global {
   type Expand<T> = T extends infer O ? { [K in keyof O]: O[K] } : never;
 
   type TimeoutId = ReturnType<typeof setTimeout>;
+  type IntervalId = ReturnType<typeof setInterval>;
 }

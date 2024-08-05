@@ -45,6 +45,4 @@ export class Logger {
   }
 }
 
-export function createLogger(options: Options = {}) {
-  return new Logger(options);
-}
+export const logger = new Logger({ level: 'DEBUG' });

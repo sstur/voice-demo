@@ -1,18 +1,17 @@
 import { WebSocket } from 'ws';
 
 import { DEEPGRAM_KEY, DEEPGRAM_WSS_URL } from './support/constants';
-import type { Logger } from './support/Logger';
+import { logger } from './support/Logger';
 import { once } from './support/once';
 import { parseMessage } from './support/parseMessage';
 
 // TODO: Proper state
 export function createTranscriber(init: {
-  logger: Logger;
   onText: (text: string) => void;
   onError: (error: Error) => void;
   onDone: () => void;
 }) {
-  const { logger, onText } = init;
+  const { onText } = init;
   const onDone = once(init.onDone);
   const onError = once(init.onError);
 
@@ -22,9 +21,9 @@ export function createTranscriber(init: {
   const flushQueue = () => {
     for (const message of dataQueue) {
       if (Buffer.isBuffer(message)) {
-        connection.send(message);
+        ws.send(message);
       } else {
-        connection.send(JSON.stringify(message));
+        ws.send(JSON.stringify(message));
       }
     }
     dataQueue.length = 0;
@@ -32,7 +31,7 @@ export function createTranscriber(init: {
 
   const send = (data: Buffer | Record<string, unknown>) => {
     dataQueue.push(data);
-    if (connection.readyState === WebSocket.OPEN) {
+    if (ws.readyState === WebSocket.OPEN) {
       flushQueue();
     } else if (Buffer.isBuffer(data)) {
       logger.debug('>> Audio chunk queued.');
@@ -41,20 +40,20 @@ export function createTranscriber(init: {
 
   const url = new URL(DEEPGRAM_WSS_URL);
   url.searchParams.set('model', 'nova-2-conversationalai');
-  const connection = new WebSocket(url, undefined, {
+  const ws = new WebSocket(url, undefined, {
     headers: {
       Authorization: `Token ${DEEPGRAM_KEY}`,
     },
   });
 
   const startTime = Date.now();
-  connection.on('open', () => {
+  ws.on('open', () => {
     const timeElapsed = Date.now() - startTime;
     logger.log(`Deepgram connection opened in ${timeElapsed}ms`);
     flushQueue();
   });
 
-  connection.on('message', (rawMessage, _isBinary) => {
+  ws.on('message', (rawMessage, _isBinary) => {
     const message = parseMessage(toString(rawMessage));
     switch (message.type) {
       case 'Results': {
@@ -68,7 +67,7 @@ export function createTranscriber(init: {
         // TODO: Find a better way to detect pause?
         if (text === '' && hasStartedSpeaking) {
           onDone();
-          connection.terminate();
+          ws.terminate();
           break;
         }
         logger.log({ text });
@@ -88,13 +87,13 @@ export function createTranscriber(init: {
     }
   });
 
-  connection.on('close', (code, reasonRaw) => {
+  ws.on('close', (code, reasonRaw) => {
     const reason = toString(reasonRaw);
     logger.log('Deepgram connection closed:', { code, reason });
     onDone();
   });
 
-  connection.on('error', (error) => {
+  ws.on('error', (error) => {
     logger.warn('Deepgram connection experienced an error:', error);
     // TODO: Clean up?
     onError(error);
@@ -108,7 +107,7 @@ export function createTranscriber(init: {
       send({ type: 'CloseStream' });
     },
     terminate: () => {
-      connection.terminate();
+      ws.terminate();
     },
   };
 }
