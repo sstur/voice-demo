@@ -289,8 +289,7 @@ class PlaybackController extends StateClass {
       uri: API_BASE_URL + playbackUrl,
       onDone: () => {
         console.log('Done playback.');
-        // TODO: Uncomment this to go back to user speaking
-        // this.onDone();
+        this.onDone();
       },
     });
   }
