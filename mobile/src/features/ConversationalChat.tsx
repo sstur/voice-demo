@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 
 import { Button, Text, VStack } from '../components/core';
 import { ConversationController } from '../recording/conversation';
@@ -9,6 +9,18 @@ type State =
 
 export function ConversationalChat() {
   const [state, setState] = useState<State>({ name: 'IDLE' });
+  const [_, forceUpdate] = useReducer((x: number) => x + 1, 0);
+
+  // Subscribe to updates on the conversation controller
+  useEffect(() => {
+    if (state.name === 'CONVERSATION_ONGOING') {
+      const { controller } = state;
+      controller.emitter.on('change', forceUpdate);
+      return () => {
+        controller.emitter.off('change', forceUpdate);
+      };
+    }
+  }, [state, forceUpdate]);
 
   const isTalking = () => {
     if (state.name === 'CONVERSATION_ONGOING') {

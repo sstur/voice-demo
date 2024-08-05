@@ -1,6 +1,7 @@
 import { API_BASE_URL } from '../support/constants';
 import { safeInvoke } from '../support/safeInvoke';
 import { sleep } from '../support/sleep';
+import { StateClass } from '../support/StateClass';
 import { playSound } from './playSound';
 import { startRecording, stopRecording } from './Recording';
 import { Socket } from './socket';
@@ -19,8 +20,48 @@ type ConversationState =
   | { name: 'CLOSED' }
   | { name: 'ERROR'; error: unknown };
 
-export class ConversationController {
+export class ConversationController extends StateClass {
   state: ConversationState = { name: 'STOPPED' };
+
+  constructor() {
+    super();
+    let removeListener: (() => void) | null = null;
+    let isEmitting = false;
+    const emitChange = () => {
+      isEmitting = true;
+      this.emitter.emit('change');
+      isEmitting = false;
+    };
+    this.emitter.on('change', () => {
+      if (isEmitting) {
+        return;
+      }
+      const state = this.state;
+      if (removeListener) {
+        removeListener();
+        removeListener = null;
+      }
+      if (state.name === 'RUNNING') {
+        const { turn } = state;
+        switch (turn.name) {
+          case 'USER_SPEAKING': {
+            turn.listeningController.emitter.on('change', emitChange);
+            removeListener = () => {
+              turn.listeningController.emitter.off('change', emitChange);
+            };
+            break;
+          }
+          case 'AGENT_SPEAKING': {
+            turn.playbackController.emitter.on('change', emitChange);
+            removeListener = () => {
+              turn.playbackController.emitter.off('change', emitChange);
+            };
+            break;
+          }
+        }
+      }
+    });
+  }
 
   private async invoke<T>(fn: () => Promise<T>): Promise<T> {
     try {
@@ -98,7 +139,7 @@ export class ConversationController {
   }
 }
 
-class ListeningController {
+class ListeningController extends StateClass {
   socket: Socket;
   state:
     | { name: 'NONE' }
@@ -114,6 +155,7 @@ class ListeningController {
     onError: (error: unknown) => void;
     onDone: () => void;
   }) {
+    super();
     const { socket, onError, onDone } = init;
     this.socket = socket;
     this.state = { name: 'NONE' };
@@ -192,7 +234,7 @@ class ListeningController {
   }
 }
 
-class PlaybackController {
+class PlaybackController extends StateClass {
   socket: Socket;
   state:
     | { name: 'NONE' }
@@ -207,6 +249,7 @@ class PlaybackController {
     onError: (error: unknown) => void;
     onDone: () => void;
   }) {
+    super();
     const { socket, onError, onDone } = init;
     this.socket = socket;
     this.state = { name: 'NONE' };
