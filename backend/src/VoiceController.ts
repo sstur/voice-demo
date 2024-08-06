@@ -1,5 +1,9 @@
 import { spawn } from 'child_process';
 
+import type {
+  WebSocketBaseResponse,
+  WebSocketResponse as WebSocketResponseWithoutDone,
+} from '@cartesia/cartesia-js';
 import Cartesia from '@cartesia/cartesia-js';
 
 import { CARTESIA_KEY } from './support/constants';
@@ -8,6 +12,10 @@ import { parseMessage } from './support/parseMessage';
 // Keep these in sync with the ffmpeg output settings below
 export const OUTPUT_FORMAT_CONTENT_TYPE = 'audio/aac';
 export const OUTPUT_FILE_NAME = 'audio.aac';
+
+// Not sure why the done response is not included in the types provided
+type WebSocketDoneResponse = WebSocketBaseResponse & { type: 'done' };
+type WebSocketResponse = WebSocketResponseWithoutDone | WebSocketDoneResponse;
 
 const cartesia = new Cartesia({
   apiKey: CARTESIA_KEY,
@@ -85,6 +93,8 @@ export class VoiceController {
     });
 
     const startTime = Date.now();
+    let firstTextSentAt: number | null = null;
+
     const websocket = cartesia.tts.websocket({
       container: 'raw',
       encoding: 'pcm_s16le',
@@ -99,6 +109,9 @@ export class VoiceController {
       return;
     }
 
+    const timeElapsed = Date.now() - startTime;
+    console.log(`Cartesia websocket.connect finished in ${timeElapsed}ms`);
+
     const beginStreaming = async (stream: AsyncIterableIterator<string>) => {
       let hasStarted = false;
       for await (const rawMessage of stream) {
@@ -106,11 +119,12 @@ export class VoiceController {
           break;
         }
         // For message types, see: https://docs.cartesia.ai/api-reference/endpoints/stream-speech-websocket
-        const message = parseMessage(rawMessage);
+        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+        const message = parseMessage(rawMessage) as WebSocketResponse;
         switch (message.type) {
           // An error message will look like: { "status_code": 500, "done": true, "type": "error", "error": "...", "context_id": "..." }
           case 'error': {
-            const error = new Error(String(message.error));
+            const error = new Error(message.error);
             onError(error);
             this.state = { name: 'ERROR', error };
             ffmpeg.kill();
@@ -121,10 +135,23 @@ export class VoiceController {
             if (!hasStarted) {
               const timeElapsed = Date.now() - startTime;
               console.log('>> Time to first audio chunk:', timeElapsed);
+              if (firstTextSentAt) {
+                const timeElapsed = Date.now() - firstTextSentAt;
+                console.log(
+                  '>> Time from first send to first audio chunk:',
+                  timeElapsed,
+                );
+              }
               hasStarted = true;
             }
-            const chunk = Buffer.from(String(message.data), 'base64');
+            const chunk = Buffer.from(message.data, 'base64');
             ffmpeg.stdin.write(chunk);
+            break;
+          }
+          // A timestamps message will look like: { "status_code": 206, "done": false, "type": "timestamps", "word_timestamps": { "words": ["Hello"], "start": [0.0], "end": [1.0] }, "context_id": "..." }
+          case 'timestamps': {
+            const words = message.word_timestamps.words.join(' ');
+            console.log('>> Playing:', JSON.stringify(words));
             break;
           }
           // A done message will look like: { "status_code": 200, "done": true, "type": "done", "context_id": "..." }
@@ -133,7 +160,7 @@ export class VoiceController {
           }
           default: {
             // eslint-disable-next-line no-console
-            console.warn('Unhandled message received from Cartesia:', message);
+            console.warn('Unexpected message received from Cartesia:', message);
           }
         }
         if (message.done) {
@@ -148,7 +175,10 @@ export class VoiceController {
     };
 
     const send = (text: string, isFinal = false) => {
-      console.log('Sending to Cartesia:', JSON.stringify(text));
+      if (firstTextSentAt === null) {
+        firstTextSentAt = Date.now();
+      }
+      console.log('>> Sending to Cartesia:', JSON.stringify(text));
       return websocket.send({
         model_id: 'sonic-english',
         voice: {
@@ -169,6 +199,7 @@ export class VoiceController {
         transcript: text,
         context_id: contextId,
         continue: !isFinal,
+        add_timestamps: true,
       });
     };
 
