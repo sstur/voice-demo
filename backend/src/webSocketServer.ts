@@ -1,25 +1,21 @@
-import type { ChatCompletionMessageParam as Message } from 'openai/resources';
 import { WebSocketServer } from 'ws';
 
-import { AgentController } from './AgentController';
-import type { DeepgramConnection } from './support/DeepgramConnection';
-import { DeepgramPool } from './support/DeepgramPool';
-import { eventLogger } from './support/EventLogger';
+import { DeepgramConnection } from './support/DeepgramConnection';
 import { logger } from './support/Logger';
 import { parseMessage } from './support/parseMessage';
+import { TextToSpeechController } from './TextToSpeechController';
 
 type ConversationState =
   | { name: 'IDLE' }
-  | { name: 'RECEIVING_AUDIO'; transcriber: DeepgramConnection }
-  | { name: 'FINALIZING_TRANSCRIPTION' }
-  | { name: 'AGENT_WORKING'; agentController: AgentController }
-  | { name: 'AGENT_DONE' }
+  | {
+      name: 'RUNNING';
+      transcriber: DeepgramConnection;
+      textToSpeechController: TextToSpeechController;
+    }
   | { name: 'CLOSED' }
   | { name: 'ERROR'; error: unknown };
 
 type Ref<T> = { current: T };
-
-const deepgramPool = new DeepgramPool();
 
 export const wss = new WebSocketServer({
   noServer: true,
@@ -29,10 +25,14 @@ export const wss = new WebSocketServer({
 
 wss.on('connection', (socket) => {
   const state: Ref<ConversationState> = { current: { name: 'IDLE' } };
-  const conversation: Array<Message> = [];
 
   const send = (message: Record<string, unknown>) => {
     socket.send(JSON.stringify(message));
+  };
+
+  const onError = (error: unknown) => {
+    logger.error(error);
+    state.current = { name: 'ERROR', error };
   };
 
   socket.on('message', (data, isBinary) => {
@@ -43,60 +43,38 @@ wss.on('connection', (socket) => {
     }
     const payload = parseMessage(toString(data));
     switch (payload.type) {
-      case 'RECORDING_STARTED': {
-        eventLogger.event('client_recording_started');
-        break;
-      }
-      case 'PLAYBACK_INIT': {
-        eventLogger.event('client_playback_init');
-        break;
-      }
-      case 'PLAYBACK_STARTED': {
-        eventLogger.event('client_playback_started');
-        break;
-      }
-      case 'START_UPLOAD_STREAM': {
-        const transcriber = deepgramPool.get();
-        readEntireStream(transcriber)
-          .then((textFragments) => {
-            // TODO: If result is empty, what should we do?
-            const content = textFragments.join(' ');
-            conversation.push({ role: 'user', content });
-            // One potential flow is frontend sends AUDIO_DONE and we call
-            // transcriber.done() which invokes this code path here.
-            // Alternatively if Deepgram identifies a period of silence it will
-            // invoke this code path and we need to tell the frontend to stop
-            // the recording.
-            send({ type: 'STOP_UPLOAD_STREAM' });
-            logger.log('Transcription complete:', JSON.stringify(content));
-            const agentController = new AgentController({
-              conversation,
-              onError: (error) => {
-                // TODO: Cleanup?
-                logger.error(error);
-                state.current = { name: 'ERROR', error };
-              },
-              onFinalTextResponse: (content) => {
-                conversation.push({ role: 'assistant', content });
-              },
-              onDone: () => {
-                state.current = { name: 'AGENT_DONE' };
-                eventLogger.event('agent_done');
-                eventLogger.dumpEventsRelative();
-              },
-            });
-            state.current = { name: 'AGENT_WORKING', agentController };
-            void agentController.start();
-          })
-          .catch((_error: unknown) => {
+      case 'INIT': {
+        const transcriber = new DeepgramConnection({
+          onText: (text) => {
+            textToSpeechController.write(text);
+          },
+          onError: (error) => onError(error),
+          onDone: () => {
             // TODO
-          });
-        state.current = { name: 'RECEIVING_AUDIO', transcriber };
-        send({ type: 'START_UPLOAD_STREAM_RESULT', success: true });
+          },
+        });
+        const textToSpeechController = new TextToSpeechController({
+          onError: (error) => onError(error),
+          onDone: () => {
+            // TODO
+          },
+        });
+        void Promise.all([
+          transcriber.start(),
+          textToSpeechController.start(),
+        ]).then(() => {
+          state.current = {
+            name: 'RUNNING',
+            transcriber,
+            textToSpeechController,
+          };
+          const playbackUrl = textToSpeechController.getOutputUrl();
+          send({ type: 'READY', playbackUrl });
+        });
         break;
       }
       case 'AUDIO_CHUNK': {
-        if (state.current.name === 'RECEIVING_AUDIO') {
+        if (state.current.name === 'RUNNING') {
           const { transcriber } = state.current;
           const { value } = payload;
           if (typeof value === 'string') {
@@ -107,39 +85,10 @@ wss.on('connection', (socket) => {
         break;
       }
       case 'AUDIO_DONE': {
-        if (state.current.name === 'RECEIVING_AUDIO') {
+        if (state.current.name === 'RUNNING') {
           const { transcriber } = state.current;
-          state.current = { name: 'FINALIZING_TRANSCRIPTION' };
+          state.current = { name: 'CLOSED' };
           transcriber.done();
-        }
-        break;
-      }
-      case 'START_PLAYBACK': {
-        const currentState = state.current;
-        switch (currentState.name) {
-          case 'FINALIZING_TRANSCRIPTION': {
-            send({ type: 'START_PLAYBACK_RESULT', status: 'TRY_AGAIN' });
-            break;
-          }
-          case 'AGENT_WORKING': {
-            const { agentController } = currentState;
-            const playbackUrl = agentController.getOutputUrl();
-            send({
-              type: 'START_PLAYBACK_RESULT',
-              status: 'READY',
-              playbackUrl,
-            });
-            break;
-          }
-          default: {
-            const errorMsg = `Unable to start playback in state ${currentState.name}`;
-            logger.warn(errorMsg);
-            send({
-              type: 'START_PLAYBACK_RESULT',
-              status: 'ERROR',
-              error: errorMsg,
-            });
-          }
         }
         break;
       }
@@ -151,7 +100,7 @@ wss.on('connection', (socket) => {
 
   socket.on('error', (error) => {
     logger.log('Client connection error:', error);
-    if (state.current.name === 'RECEIVING_AUDIO') {
+    if (state.current.name === 'RUNNING') {
       const { transcriber } = state.current;
       transcriber.terminate();
     }
@@ -159,13 +108,11 @@ wss.on('connection', (socket) => {
 
   socket.on('close', () => {
     logger.log('Client connection closed.');
-    if (state.current.name === 'RECEIVING_AUDIO') {
+    if (state.current.name === 'RUNNING') {
       const { transcriber } = state.current;
       transcriber.terminate();
     }
   });
-
-  send({ type: 'READY' });
 });
 
 function toString(input: Buffer | ArrayBuffer | Array<Buffer>) {
@@ -176,12 +123,4 @@ function toString(input: Buffer | ArrayBuffer | Array<Buffer>) {
     return Buffer.concat(input).toString('utf8');
   }
   return Buffer.from(input).toString('utf8');
-}
-
-async function readEntireStream<T>(readable: AsyncIterable<T>) {
-  const results: Array<T> = [];
-  for await (const chunk of readable) {
-    results.push(chunk);
-  }
-  return results;
 }

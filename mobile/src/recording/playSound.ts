@@ -5,7 +5,7 @@ export async function playSound(init: { uri: string; onDone: () => void }) {
   const shouldDownloadFirst = false;
   const unloadAsync = once(() => sound.unloadAsync());
   await Audio.setAudioModeAsync({
-    allowsRecordingIOS: false,
+    // allowsRecordingIOS: false,
   });
   const { sound } = await Audio.Sound.createAsync(
     { uri },

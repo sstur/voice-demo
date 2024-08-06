@@ -1,6 +1,5 @@
 import { WebSocket } from 'ws';
 
-import { AsyncQueue } from './AsyncQueue';
 import { DEEPGRAM_KEY, DEEPGRAM_WSS_URL } from './constants';
 import { eventLogger } from './EventLogger';
 import { logger } from './Logger';
@@ -14,70 +13,78 @@ type State =
   | { name: 'ERROR'; error: unknown }
   | { name: 'CLOSED' };
 
-export class DeepgramConnection implements AsyncIterable<string> {
+export class DeepgramConnection {
   private state: State;
   private ws: WebSocket;
-  private asyncQueue: AsyncQueue<string>;
   private audioBytesSent = 0;
   /** The number of characters received */
   private receivedCharCount = 0;
   /** The number chunks of text received (including empty ones) */
   private receivedChunkCount = 0;
+  private onReadyPromise: Promise<void>;
+  private onText: (text: string) => void;
 
-  constructor() {
+  constructor(init: {
+    onText: (text: string) => void;
+    onError: (error: unknown) => void;
+    onDone: () => void;
+  }) {
+    const { onText, onError, onDone } = init;
+    this.onText = onText;
     this.state = { name: 'INITIALIZING', queue: [] };
-    this.asyncQueue = new AsyncQueue();
 
+    eventLogger.event('stt_init');
     const url = new URL(DEEPGRAM_WSS_URL);
     url.searchParams.set('model', 'nova-2-conversationalai');
-    const ws = new WebSocket(url, undefined, {
+
+    const ws = (this.ws = new WebSocket(url, undefined, {
       headers: {
         Authorization: `Token ${DEEPGRAM_KEY}`,
       },
-    });
+    }));
 
-    const startTime = Date.now();
-    ws.on('open', () => {
-      const { state } = this;
-      if (state.name !== 'INITIALIZING') {
-        return;
-      }
-      const timeElapsed = Date.now() - startTime;
-      logger.log(`Deepgram connection opened in ${timeElapsed}ms`);
-      for (const message of state.queue) {
-        this.sendImmediate(message);
-      }
-      const keepaliveTimer = setInterval(
-        () => this.sendImmediate({ type: 'KeepAlive' }),
-        KEEPALIVE_INTERVAL_MS,
-      );
-      this.state = { name: 'READY', keepaliveTimer };
-    });
+    this.onReadyPromise = new Promise<void>((resolve, reject) => {
+      ws.on('open', () => {
+        const { state } = this;
+        if (state.name !== 'INITIALIZING') {
+          return;
+        }
+        eventLogger.event('stt_connected');
+        for (const message of state.queue) {
+          this.sendImmediate(message);
+        }
+        const keepaliveTimer = setInterval(
+          () => this.sendImmediate({ type: 'KeepAlive' }),
+          KEEPALIVE_INTERVAL_MS,
+        );
+        this.state = { name: 'READY', keepaliveTimer };
+        resolve();
+      });
 
-    ws.on('message', (rawMessage, _isBinary) => {
-      const message = parseMessage(toString(rawMessage));
-      this.onMessage(message);
-    });
+      ws.on('message', (rawMessage, _isBinary) => {
+        const message = parseMessage(toString(rawMessage));
+        this.onMessage(message);
+      });
 
-    ws.on('close', (code, reasonRaw) => {
-      const { state } = this;
-      const reason = toString(reasonRaw);
-      logger.log('Deepgram connection closed:', { code, reason });
-      this.cleanup();
-      if (state.name !== 'ERROR' && state.name !== 'CLOSED') {
-        this.state = { name: 'CLOSED' };
-        this.asyncQueue.close();
-      }
-    });
+      ws.on('close', (code, reasonRaw) => {
+        const { state } = this;
+        const reason = toString(reasonRaw);
+        logger.log('Deepgram connection closed:', { code, reason });
+        this.cleanup();
+        if (state.name !== 'ERROR' && state.name !== 'CLOSED') {
+          this.state = { name: 'CLOSED' };
+          onDone();
+        }
+      });
 
-    ws.on('error', (error) => {
-      logger.warn('Deepgram connection experienced an error:', error);
-      this.cleanup();
-      this.state = { name: 'ERROR', error };
-      this.asyncQueue.close();
+      ws.on('error', (error) => {
+        logger.warn('Deepgram connection experienced an error:', error);
+        this.cleanup();
+        this.state = { name: 'ERROR', error };
+        reject(error);
+        onError(error);
+      });
     });
-
-    this.ws = ws;
   }
 
   private sendImmediate(data: Buffer | Record<string, unknown>) {
@@ -110,7 +117,6 @@ export class DeepgramConnection implements AsyncIterable<string> {
   }
 
   private onMessage(message: Record<string, unknown>) {
-    const hasReceivedText = this.receivedCharCount > 0;
     switch (message.type) {
       case 'Results': {
         // Should look like: { "type": "Results", "channel_index": [0, 1], "duration": 0.061875343, "start": 7.74, "is_final": true, "speech_final": false, "channel": { "alternatives": [{ "transcript": "...", "confidence": 1, "words": [{ "word": "foo", "start": 1.72, "end": 1.96, "confidence": 0.9970703 }] }] }, "metadata": { "request_id": "...", "model_uuid": "...", "model_info": { ... } }, "from_finalize": false }
@@ -124,14 +130,9 @@ export class DeepgramConnection implements AsyncIterable<string> {
         }
         this.receivedCharCount += text.length;
         this.receivedChunkCount += 1;
-        // TODO: Find a better way to detect pause?
-        if (text === '' && hasReceivedText) {
-          this.terminate();
-          break;
-        }
-        logger.log({ text });
+        logger.log('>> Text:', JSON.stringify(text));
         if (text) {
-          void this.asyncQueue.write(text);
+          this.onText(text);
         }
         break;
       }
@@ -143,6 +144,10 @@ export class DeepgramConnection implements AsyncIterable<string> {
         logger.warn('Unrecognized Deepgram message:', message);
       }
     }
+  }
+
+  start() {
+    return this.onReadyPromise;
   }
 
   send(data: Buffer) {
@@ -171,12 +176,7 @@ export class DeepgramConnection implements AsyncIterable<string> {
     if (state.name !== 'ERROR' && state.name !== 'CLOSED') {
       ws.terminate();
       this.state = { name: 'CLOSED' };
-      this.asyncQueue.close();
     }
-  }
-
-  [Symbol.asyncIterator]() {
-    return this.asyncQueue[Symbol.asyncIterator]();
   }
 }
 

@@ -31,23 +31,13 @@ export class AgentController {
   }
 
   async start() {
-    const { conversation, contextId, outputQueue, onError, onDone } = this;
-    const responseStream = await createAgentResponse(conversation);
+    const { conversation, onError, onDone } = this;
+    const _responseStream = await createAgentResponse(conversation);
     const textToSpeechController = new TextToSpeechController({
-      inputStream: responseStream,
-      contextId,
-      onFinalTextResponse: this.onFinalTextResponse,
-      onAudioChunk: (chunk) => {
-        void outputQueue.write(chunk);
-      },
-      onError: (error) => {
-        outputQueue.close();
-        onError(error);
-      },
-      onDone: () => {
-        outputQueue.close();
-        onDone();
-      },
+      // inputStream: responseStream,
+      // contextId,
+      onError: (error) => onError(error),
+      onDone: () => onDone(),
     });
     await textToSpeechController.start();
   }

@@ -22,17 +22,6 @@ export function ConversationalChat() {
     }
   }, [state, forceUpdate]);
 
-  const isTalking = () => {
-    if (state.name === 'CONVERSATION_ONGOING') {
-      const { controller } = state;
-      if (controller.state.name === 'RUNNING') {
-        const { turn } = controller.state;
-        return turn.name === 'USER_SPEAKING';
-      }
-    }
-    return false;
-  };
-
   return (
     <VStack flex={1} justifyContent="center" alignItems="center">
       {state.name === 'IDLE' ? (
@@ -51,17 +40,13 @@ export function ConversationalChat() {
       ) : (
         <>
           <Text>{t('Running...')}</Text>
-          {isTalking() ? (
-            <Button
-              onPress={() => {
-                const controller = new ConversationController();
-                setState({ name: 'CONVERSATION_ONGOING', controller });
-                void controller.start();
-              }}
-            >
-              {t('Done Talking')}
-            </Button>
-          ) : null}
+          <Button
+            onPress={() => {
+              // TODO: state.controller.stop()
+            }}
+          >
+            {t('Done Talking')}
+          </Button>
         </>
       )}
     </VStack>
