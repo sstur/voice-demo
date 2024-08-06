@@ -1,7 +1,7 @@
 import {
   OUTPUT_FILE_NAME,
   OUTPUT_FORMAT_CONTENT_TYPE,
-} from '../VoiceController';
+} from '../TextToSpeechController';
 import { voiceResponseStore } from '../voiceResponseStore';
 
 // eslint-disable-next-line @typescript-eslint/require-await

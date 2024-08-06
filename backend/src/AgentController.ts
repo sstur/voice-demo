@@ -3,7 +3,7 @@ import type { ChatCompletionMessageParam as Message } from 'openai/resources';
 import { createAgentResponse } from './agent';
 import type { AsyncQueue } from './support/AsyncQueue';
 import { createId } from './support/createId';
-import { VoiceController } from './VoiceController';
+import { TextToSpeechController } from './TextToSpeechController';
 import { voiceResponseStore } from './voiceResponseStore';
 
 export class AgentController {
@@ -33,7 +33,7 @@ export class AgentController {
   async start() {
     const { conversation, contextId, outputQueue, onError, onDone } = this;
     const responseStream = await createAgentResponse(conversation);
-    const voiceController = new VoiceController({
+    const textToSpeechController = new TextToSpeechController({
       inputStream: responseStream,
       contextId,
       onFinalTextResponse: this.onFinalTextResponse,
@@ -49,7 +49,7 @@ export class AgentController {
         onDone();
       },
     });
-    await voiceController.start();
+    await textToSpeechController.start();
   }
 
   getOutputUrl() {

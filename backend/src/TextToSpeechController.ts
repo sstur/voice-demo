@@ -26,7 +26,7 @@ type State =
   | { name: 'RUNNING' }
   | { name: 'ERROR'; error: unknown };
 
-export class VoiceController {
+export class TextToSpeechController {
   state: State = { name: 'NONE' };
   inputStream: AsyncIterableIterator<string>;
   contextId: string;
