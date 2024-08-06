@@ -42,7 +42,7 @@ export class Socket {
   }
 
   async send(message: Message) {
-    const ws = this.getWebSocket('write');
+    const ws = this.getWebSocket('send');
     ws.send(JSON.stringify(message));
     await flush(ws);
   }
