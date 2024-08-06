@@ -105,9 +105,10 @@ export class VoiceController {
         if (this.state.name === 'ERROR') {
           break;
         }
+        // For message types, see: https://docs.cartesia.ai/api-reference/endpoints/stream-speech-websocket
         const message = parseMessage(rawMessage);
         switch (message.type) {
-          // An error message will look like: { "type": "error", "context_id": "...", "status_code": 500, "done": true, "error": "..." }
+          // An error message will look like: { "status_code": 500, "done": true, "type": "error", "error": "...", "context_id": "..." }
           case 'error': {
             const error = new Error(String(message.error));
             onError(error);
@@ -115,7 +116,7 @@ export class VoiceController {
             ffmpeg.kill();
             break;
           }
-          // A data chunk will look like: { "type": "chunk", "context_id": "...", "status_code": 206, "done": false, "data": "....", "step_time": 55.578796 }
+          // A data chunk will look like: { "status_code": 206, "done": false, "type": "chunk", "data": "....", "step_time": 55.578796, "context_id": "..." }
           case 'chunk': {
             if (!hasStarted) {
               const timeElapsed = Date.now() - startTime;
@@ -126,7 +127,7 @@ export class VoiceController {
             ffmpeg.stdin.write(chunk);
             break;
           }
-          // A done message will look like: { "type": "done", "context_id": "...", "status_code": 200, "done": true }
+          // A done message will look like: { "status_code": 200, "done": true, "type": "done", "context_id": "..." }
           case 'done': {
             break;
           }
