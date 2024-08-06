@@ -43,6 +43,18 @@ wss.on('connection', (socket) => {
     }
     const payload = parseMessage(toString(data));
     switch (payload.type) {
+      case 'RECORDING_STARTED': {
+        eventLogger.event('client_recording_started');
+        break;
+      }
+      case 'PLAYBACK_INIT': {
+        eventLogger.event('client_playback_init');
+        break;
+      }
+      case 'PLAYBACK_STARTED': {
+        eventLogger.event('client_playback_started');
+        break;
+      }
       case 'START_UPLOAD_STREAM': {
         const transcriber = deepgramPool.get();
         readEntireStream(transcriber)
@@ -130,6 +142,9 @@ wss.on('connection', (socket) => {
           }
         }
         break;
+      }
+      default: {
+        logger.warn('Unrecognized message from client:', payload);
       }
     }
   });

@@ -193,6 +193,7 @@ class ListeningController extends StateClass {
       this.onError(errorMessage);
       return;
     }
+    void this.socket.send({ type: 'RECORDING_STARTED' });
     console.log('>> Started listening...');
     this.state = { name: 'LISTENING' };
     const readableStream = result.result;
@@ -285,12 +286,19 @@ class PlaybackController extends StateClass {
     }
     // TODO: Change state; enable cancel button in UI
     const playbackUrl = String(message.playbackUrl);
+    const startTime = Date.now();
+    console.log('Starting playback...');
+    void this.socket.send({ type: 'PLAYBACK_INIT' });
     const _sound = await playSound({
       uri: API_BASE_URL + playbackUrl,
       onDone: () => {
-        console.log('Done playback.');
+        const timeElapsed = Date.now() - startTime;
+        console.log(`Playback complete in ${timeElapsed}ms`);
         this.onDone();
       },
     });
+    const timeElapsed = Date.now() - startTime;
+    console.log(`Playback started in ${timeElapsed}ms`);
+    void this.socket.send({ type: 'PLAYBACK_STARTED' });
   }
 }
