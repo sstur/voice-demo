@@ -7,6 +7,7 @@ import type {
 import Cartesia from '@cartesia/cartesia-js';
 
 import { CARTESIA_KEY } from './support/constants';
+import { eventLogger } from './support/EventLogger';
 import { logger } from './support/Logger';
 import { parseMessage } from './support/parseMessage';
 
@@ -92,9 +93,7 @@ export class TextToSpeechController {
       onDone();
     });
 
-    const startTime = Date.now();
-    let firstTextSentAt: number | null = null;
-
+    eventLogger.event('tts_init');
     const websocket = cartesia.tts.websocket({
       container: 'raw',
       encoding: 'pcm_s16le',
@@ -109,11 +108,10 @@ export class TextToSpeechController {
       return;
     }
 
-    const timeElapsed = Date.now() - startTime;
-    console.log(`Cartesia websocket.connect finished in ${timeElapsed}ms`);
+    eventLogger.event('tts_connected');
 
     const beginStreaming = async (stream: AsyncIterableIterator<string>) => {
-      let hasStarted = false;
+      let hasReceivedAudio = false;
       for await (const rawMessage of stream) {
         if (this.state.name === 'ERROR') {
           break;
@@ -132,17 +130,9 @@ export class TextToSpeechController {
           }
           // A data chunk will look like: { "status_code": 206, "done": false, "type": "chunk", "data": "....", "step_time": 55.578796, "context_id": "..." }
           case 'chunk': {
-            if (!hasStarted) {
-              const timeElapsed = Date.now() - startTime;
-              console.log('>> Time to first audio chunk:', timeElapsed);
-              if (firstTextSentAt) {
-                const timeElapsed = Date.now() - firstTextSentAt;
-                console.log(
-                  '>> Time from first send to first audio chunk:',
-                  timeElapsed,
-                );
-              }
-              hasStarted = true;
+            if (!hasReceivedAudio) {
+              eventLogger.event('tts_first_audio_received');
+              hasReceivedAudio = true;
             }
             const chunk = Buffer.from(message.data, 'base64');
             ffmpeg.stdin.write(chunk);
@@ -173,9 +163,11 @@ export class TextToSpeechController {
       }
     };
 
+    let hasSentText = false;
     const send = (text: string, isFinal = false) => {
-      if (firstTextSentAt === null) {
-        firstTextSentAt = Date.now();
+      if (!hasSentText) {
+        eventLogger.event('tts_first_text_sent');
+        hasSentText = true;
       }
       logger.log('>> Sending to Cartesia:', JSON.stringify(text));
       return websocket.send({
@@ -232,6 +224,7 @@ export class TextToSpeechController {
       }
     }
     send(tokens.join(''), true);
+    eventLogger.event('tts_all_text_sent');
     this.onFinalTextResponse(allTokens.join(''));
   }
 }

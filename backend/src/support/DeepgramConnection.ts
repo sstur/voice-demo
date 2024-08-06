@@ -2,6 +2,7 @@ import { WebSocket } from 'ws';
 
 import { AsyncQueue } from './AsyncQueue';
 import { DEEPGRAM_KEY, DEEPGRAM_WSS_URL } from './constants';
+import { eventLogger } from './EventLogger';
 import { logger } from './Logger';
 import { parseMessage } from './parseMessage';
 
@@ -14,10 +15,14 @@ type State =
   | { name: 'CLOSED' };
 
 export class DeepgramConnection implements AsyncIterable<string> {
-  private textFragments: Array<string> = [];
   private state: State;
   private ws: WebSocket;
   private asyncQueue: AsyncQueue<string>;
+  private audioBytesSent = 0;
+  /** The number of characters received */
+  private receivedCharCount = 0;
+  /** The number chunks of text received (including empty ones) */
+  private receivedChunkCount = 0;
 
   constructor() {
     this.state = { name: 'INITIALIZING', queue: [] };
@@ -79,14 +84,19 @@ export class DeepgramConnection implements AsyncIterable<string> {
     const { state } = this;
     if (state.name !== 'READY') {
       logger.warn(
-        `>> Attempted send while DeepgramConnection in state ${state.name}`,
+        `Attempted send while DeepgramConnection in state ${state.name}`,
       );
       return;
     }
     if (Buffer.isBuffer(data)) {
+      if (this.audioBytesSent === 0) {
+        eventLogger.event('stt_first_audio_chunk_sent');
+      }
+      this.audioBytesSent += data.length;
       this.ws.send(data);
     } else {
-      this.ws.send(JSON.stringify(data));
+      const message = JSON.stringify(data);
+      this.ws.send(message);
     }
   }
 
@@ -100,7 +110,7 @@ export class DeepgramConnection implements AsyncIterable<string> {
   }
 
   private onMessage(message: Record<string, unknown>) {
-    const { textFragments } = this;
+    const hasReceivedText = this.receivedCharCount > 0;
     switch (message.type) {
       case 'Results': {
         // Should look like: { "type": "Results", "channel_index": [0, 1], "duration": 0.061875343, "start": 7.74, "is_final": true, "speech_final": false, "channel": { "alternatives": [{ "transcript": "...", "confidence": 1, "words": [{ "word": "foo", "start": 1.72, "end": 1.96, "confidence": 0.9970703 }] }] }, "metadata": { "request_id": "...", "model_uuid": "...", "model_info": { ... } }, "from_finalize": false }
@@ -109,16 +119,19 @@ export class DeepgramConnection implements AsyncIterable<string> {
         const transcript = String(result.transcript ?? '');
         // I actually don't believe this is necessary, it comes already trimmed
         const text = transcript.trim();
-        const hasStartedSpeaking = textFragments.length > 0;
+        if (this.receivedChunkCount === 0) {
+          eventLogger.event('stt_first_text_received');
+        }
+        this.receivedCharCount += text.length;
+        this.receivedChunkCount += 1;
         // TODO: Find a better way to detect pause?
-        if (text === '' && hasStartedSpeaking) {
+        if (text === '' && hasReceivedText) {
           this.terminate();
           break;
         }
         logger.log({ text });
         if (text) {
           void this.asyncQueue.write(text);
-          textFragments.push(text);
         }
         break;
       }
@@ -152,6 +165,7 @@ export class DeepgramConnection implements AsyncIterable<string> {
   }
 
   terminate() {
+    eventLogger.event('stt_done');
     const { state, ws } = this;
     this.cleanup();
     if (state.name !== 'ERROR' && state.name !== 'CLOSED') {

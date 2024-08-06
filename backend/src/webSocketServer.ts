@@ -4,6 +4,7 @@ import { WebSocketServer } from 'ws';
 import { AgentController } from './AgentController';
 import type { DeepgramConnection } from './support/DeepgramConnection';
 import { DeepgramPool } from './support/DeepgramPool';
+import { eventLogger } from './support/EventLogger';
 import { logger } from './support/Logger';
 import { parseMessage } from './support/parseMessage';
 
@@ -68,6 +69,8 @@ wss.on('connection', (socket) => {
               },
               onDone: () => {
                 state.current = { name: 'AGENT_DONE' };
+                eventLogger.event('agent_done');
+                eventLogger.dumpEventsRelative();
               },
             });
             state.current = { name: 'AGENT_WORKING', agentController };

@@ -1,6 +1,8 @@
 import OpenAI from 'openai';
 import type { ChatCompletionMessageParam as Message } from 'openai/resources';
 
+import { eventLogger } from './support/EventLogger';
+
 export const openai = new OpenAI({
   apiKey: process.env.OPENAI_KEY,
 });
@@ -20,7 +22,7 @@ You will use your best judgement to determine what the user meant, even if it is
 `.trim();
 
 export async function createAgentResponse(conversation: Array<Message>) {
-  const startTime = Date.now();
+  eventLogger.event('llm_init');
   const stream = await openai.chat.completions.create({
     model: 'gpt-4o',
     messages: [
@@ -32,6 +34,7 @@ export async function createAgentResponse(conversation: Array<Message>) {
     ],
     stream: true,
   });
+  eventLogger.event('llm_request_sent');
   // eslint-disable-next-line functions/top-level-fn-decl
   const getAsyncIterator = async function* (): AsyncIterableIterator<string> {
     let hasStarted = false;
@@ -39,8 +42,7 @@ export async function createAgentResponse(conversation: Array<Message>) {
       const content = chunk.choices[0]?.delta?.content;
       if (content) {
         if (!hasStarted) {
-          const timeElapsed = Date.now() - startTime;
-          console.log('>> Time to first token:', timeElapsed);
+          eventLogger.event('llm_first_token_received');
           hasStarted = true;
         }
         yield content;
