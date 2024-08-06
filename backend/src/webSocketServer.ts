@@ -1,3 +1,4 @@
+import type { ChatCompletionMessageParam as Message } from 'openai/resources';
 import { WebSocketServer } from 'ws';
 
 import { AgentController } from './AgentController';
@@ -27,6 +28,7 @@ export const wss = new WebSocketServer({
 
 wss.on('connection', (socket) => {
   const state: Ref<ConversationState> = { current: { name: 'IDLE' } };
+  const conversation: Array<Message> = [];
 
   const send = (message: Record<string, unknown>) => {
     socket.send(JSON.stringify(message));
@@ -44,20 +46,24 @@ wss.on('connection', (socket) => {
         readEntireStream(transcriber)
           .then((textFragments) => {
             // TODO: If result is empty, what should we do?
-            const result = textFragments.join(' ');
+            const content = textFragments.join(' ');
+            conversation.push({ role: 'user', content });
             // One potential flow is frontend sends AUDIO_DONE and we call
             // transcriber.done() which invokes this code path here.
             // Alternatively if Deepgram identifies a period of silence it will
             // invoke this code path and we need to tell the frontend to stop
             // the recording.
             send({ type: 'STOP_UPLOAD_STREAM' });
-            logger.log('Transcription complete:', JSON.stringify(result));
+            logger.log('Transcription complete:', JSON.stringify(content));
             const agentController = new AgentController({
-              userInput: result,
+              conversation,
               onError: (error) => {
                 // TODO: Cleanup?
                 logger.error(error);
                 state.current = { name: 'ERROR', error };
+              },
+              onFinalTextResponse: (content) => {
+                conversation.push({ role: 'assistant', content });
               },
               onDone: () => {
                 state.current = { name: 'AGENT_DONE' };

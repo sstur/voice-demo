@@ -1,3 +1,5 @@
+import type { ChatCompletionMessageParam as Message } from 'openai/resources';
+
 import { createAgentResponse } from './agent';
 import type { AsyncQueue } from './support/AsyncQueue';
 import { createId } from './support/createId';
@@ -6,32 +8,36 @@ import { voiceResponseStore } from './voiceResponseStore';
 
 export class AgentController {
   state: { name: 'NONE' } = { name: 'NONE' };
-  userInput: string;
+  conversation: Array<Message>;
   contextId: string;
   outputQueue: AsyncQueue<Buffer>;
   onError: (error: unknown) => void;
+  onFinalTextResponse: (content: string) => void;
   onDone: () => void;
 
   constructor(init: {
-    userInput: string;
+    conversation: Array<Message>;
     onError: (error: unknown) => void;
+    onFinalTextResponse: (content: string) => void;
     onDone: () => void;
   }) {
-    const { userInput, onError, onDone } = init;
-    this.userInput = userInput;
+    const { conversation, onError, onFinalTextResponse, onDone } = init;
+    this.conversation = conversation;
     const contextId = (this.contextId = createId());
     this.outputQueue = voiceResponseStore.create(contextId);
     this.onError = onError;
+    this.onFinalTextResponse = onFinalTextResponse;
     this.onDone = onDone;
   }
 
   async start() {
-    const { userInput, contextId, outputQueue, onError, onDone } = this;
-    const responseStream = await createAgentResponse(userInput);
+    const { conversation, contextId, outputQueue, onError, onDone } = this;
+    const responseStream = await createAgentResponse(conversation);
     const voiceController = new VoiceController({
       inputStream: responseStream,
       contextId,
-      onChunk: (chunk) => {
+      onFinalTextResponse: this.onFinalTextResponse,
+      onAudioChunk: (chunk) => {
         void outputQueue.write(chunk);
       },
       onError: (error) => {

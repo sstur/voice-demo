@@ -22,27 +22,37 @@ export class VoiceController {
   state: State = { name: 'NONE' };
   inputStream: AsyncIterableIterator<string>;
   contextId: string;
-  onChunk: (chunk: Buffer) => void;
+  onAudioChunk: (chunk: Buffer) => void;
   onError: (error: unknown) => void;
+  onFinalTextResponse: (content: string) => void;
   onDone: () => void;
 
   constructor(init: {
     inputStream: AsyncIterableIterator<string>;
     contextId: string;
-    onChunk: (chunk: Buffer) => void;
+    onAudioChunk: (chunk: Buffer) => void;
     onError: (error: unknown) => void;
+    onFinalTextResponse: (content: string) => void;
     onDone: () => void;
   }) {
-    const { inputStream, contextId, onChunk, onError, onDone } = init;
+    const {
+      inputStream,
+      contextId,
+      onAudioChunk,
+      onError,
+      onFinalTextResponse,
+      onDone,
+    } = init;
     this.inputStream = inputStream;
     this.contextId = contextId;
-    this.onChunk = onChunk;
+    this.onAudioChunk = onAudioChunk;
     this.onError = onError;
+    this.onFinalTextResponse = onFinalTextResponse;
     this.onDone = onDone;
   }
 
   async start() {
-    const { inputStream, contextId, onChunk, onError, onDone } = this;
+    const { inputStream, contextId, onAudioChunk, onError, onDone } = this;
 
     const ffmpeg = spawn(
       'ffmpeg',
@@ -58,7 +68,7 @@ export class VoiceController {
     );
 
     ffmpeg.stdout.on('data', (chunk: Buffer) => {
-      onChunk(chunk);
+      onAudioChunk(chunk);
     });
 
     ffmpeg.stdout.on('error', (error) => {
@@ -163,11 +173,13 @@ export class VoiceController {
 
     let hasStartedStreaming = false;
     const tokens: Array<string> = [];
+    const allTokens: Array<string> = [];
     for await (const token of inputStream) {
       if (this.state.name === 'ERROR') {
         break;
       }
       tokens.push(token);
+      allTokens.push(token);
       // Accumulate a few tokens before sending.
       if (tokens.length > 4) {
         const joined = tokens.join('');
@@ -189,5 +201,6 @@ export class VoiceController {
       }
     }
     send(tokens.join(''), true);
+    this.onFinalTextResponse(allTokens.join(''));
   }
 }

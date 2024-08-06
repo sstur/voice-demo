@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import type { ChatCompletionMessageParam as Message } from 'openai/resources';
 
 export const openai = new OpenAI({
   apiKey: process.env.OPENAI_KEY,
@@ -18,7 +19,7 @@ The user input has been transcribed from voice meaning that sometimes words migh
 You will use your best judgement to determine what the user meant, even if it is transcribed wrong. Where possible make a best guess what the user meant rather than asking clarifying questions.
 `.trim();
 
-export async function createAgentResponse(userInput: string) {
+export async function createAgentResponse(conversation: Array<Message>) {
   const startTime = Date.now();
   const stream = await openai.chat.completions.create({
     model: 'gpt-4o',
@@ -27,10 +28,7 @@ export async function createAgentResponse(userInput: string) {
         role: 'system',
         content: systemPrompt,
       },
-      {
-        role: 'user',
-        content: userInput,
-      },
+      ...conversation,
     ],
     stream: true,
   });
