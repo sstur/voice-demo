@@ -37,6 +37,7 @@ wss.on('connection', (socket) => {
   socket.on('message', (data, isBinary) => {
     // Not currently supporting binary messages
     if (isBinary) {
+      logger.warn(`Unsupported: Received binary message from client`);
       return;
     }
     const payload = parseMessage(toString(data));
@@ -116,10 +117,13 @@ wss.on('connection', (socket) => {
             break;
           }
           default: {
-            const error = `Unable to start playback in state ${currentState.name}`;
-            // eslint-disable-next-line no-console
-            console.warn(error);
-            send({ type: 'START_PLAYBACK_RESULT', status: 'ERROR', error });
+            const errorMsg = `Unable to start playback in state ${currentState.name}`;
+            logger.warn(errorMsg);
+            send({
+              type: 'START_PLAYBACK_RESULT',
+              status: 'ERROR',
+              error: errorMsg,
+            });
           }
         }
         break;

@@ -7,6 +7,7 @@ import type {
 import Cartesia from '@cartesia/cartesia-js';
 
 import { CARTESIA_KEY } from './support/constants';
+import { logger } from './support/Logger';
 import { parseMessage } from './support/parseMessage';
 
 // Keep these in sync with the ffmpeg output settings below
@@ -86,8 +87,7 @@ export class TextToSpeechController {
 
     ffmpeg.on('close', (code) => {
       if (code !== 0) {
-        // eslint-disable-next-line no-console
-        console.warn(`FFmpeg process exited with code ${code}`);
+        logger.warn(`FFmpeg process exited with code ${code}`);
       }
       onDone();
     });
@@ -151,7 +151,7 @@ export class TextToSpeechController {
           // A timestamps message will look like: { "status_code": 206, "done": false, "type": "timestamps", "word_timestamps": { "words": ["Hello"], "start": [0.0], "end": [1.0] }, "context_id": "..." }
           case 'timestamps': {
             const words = message.word_timestamps.words.join(' ');
-            console.log('>> Playing:', JSON.stringify(words));
+            logger.log('>> Playing:', JSON.stringify(words));
             break;
           }
           // A done message will look like: { "status_code": 200, "done": true, "type": "done", "context_id": "..." }
@@ -159,8 +159,7 @@ export class TextToSpeechController {
             break;
           }
           default: {
-            // eslint-disable-next-line no-console
-            console.warn('Unexpected message received from Cartesia:', message);
+            logger.warn('Unexpected message received from Cartesia:', message);
           }
         }
         if (message.done) {
@@ -178,7 +177,7 @@ export class TextToSpeechController {
       if (firstTextSentAt === null) {
         firstTextSentAt = Date.now();
       }
-      console.log('>> Sending to Cartesia:', JSON.stringify(text));
+      logger.log('>> Sending to Cartesia:', JSON.stringify(text));
       return websocket.send({
         model_id: 'sonic-english',
         voice: {
