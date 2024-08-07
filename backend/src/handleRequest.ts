@@ -1,4 +1,5 @@
 import { createReadStream } from 'fs';
+import { readFile } from 'fs/promises';
 import { resolve } from 'path';
 
 import { playbackHandler } from './handlers/playbackHandler';
@@ -23,20 +24,12 @@ export async function handleRequest(
     }
     case pathname === '/audio.pcm': {
       const path = resolve(__dirname, './assets/audio.pcm');
-      const readStream = createReadStream(path);
-      return new Response(getAsyncIterator(readStream), {
+      const data = await readFile(path);
+      const encoded = data.toString('base64');
+      return new Response(encoded, {
         headers: { 'content-type': 'text/plain' },
       });
     }
   }
   return new Response('Not Found', { status: 404 });
-}
-
-async function* getAsyncIterator(
-  readStream: AsyncIterable<Buffer>,
-): AsyncIterable<Uint8Array> {
-  for await (const chunk of readStream) {
-    const encoded = chunk.toString('base64');
-    yield Buffer.from(encoded, 'ascii');
-  }
 }
