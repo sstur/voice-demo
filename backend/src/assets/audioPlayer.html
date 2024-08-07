@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+  <body>
+    <script>
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      const audioContext = new AudioContext();
+      let sourceNode = null;
+      let mediaSource = null;
+      let sourceBuffer = null;
+      let queue = [];
+      let mediaSourceReady = false;
+
+      document.addEventListener('DOMContentLoaded', () => {
+        // TODO: Consider if this should return a promise
+        // Should we load some chunks of audio into the queue first?
+        setupMediaSource();
+        send({ type: 'READY' });
+      });
+
+      window.addEventListener('message', (event) => {
+        const data = JSON.parse(String(event.data));
+        switch (data.type) {
+          case 'LOG': {
+            logToPage(data.value);
+          }
+          case 'AUDIO_CHUNK': {
+            const chunk = fromBase64(data.value);
+            queue.push(chunk);
+            if (mediaSourceReady) {
+              appendToSourceBuffer();
+            }
+          }
+        }
+      });
+
+      function setupMediaSource() {
+        mediaSource = new MediaSource();
+        const audioElement = document.createElement('audio');
+        audioElement.controls = true;
+        audioElement.src = URL.createObjectURL(mediaSource);
+        document.body.appendChild(audioElement);
+
+        mediaSource.addEventListener('sourceopen', () => {
+          const mimeCodec = 'audio/mp4; codecs="mp4a.40.2"'; // For AAC
+          sourceBuffer = mediaSource.addSourceBuffer(mimeCodec);
+          sourceBuffer.addEventListener('updateend', appendToSourceBuffer);
+          mediaSourceReady = true;
+          appendToSourceBuffer();
+        });
+      }
+
+      function appendToSourceBuffer() {
+        if (queue.length > 0 && !sourceBuffer.updating) {
+          sourceBuffer.appendBuffer(queue.shift());
+        }
+      }
+
+      function fromBase64(str) {
+        const binaryString = atob(str);
+        return Uint8Array.from(binaryString, (ch) => ch.charCodeAt(0));
+      }
+
+      function send(value) {
+        window.ReactNativeWebView.postMessage(JSON.stringify(value));
+      }
+
+      function log(...args) {
+        send({ type: 'LOG', args });
+      }
+
+      function logToPage(value) {
+        const code = document.createElement('code');
+        code.appendChild(document.createTextNode(String(value)));
+        const pre = document.createElement('pre');
+        pre.appendChild(code);
+        document.body.appendChild(pre);
+      }
+    </script>
+  </body>
+</html>
