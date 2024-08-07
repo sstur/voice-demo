@@ -1,6 +1,9 @@
+import { API_BASE_URL } from '../support/constants';
+import { safeInvoke } from '../support/safeInvoke';
+import { sleep } from '../support/sleep';
 import { StateClass } from '../support/StateClass';
-import { ListeningController } from './ListeningController';
-import { PlaybackController } from './PlaybackController';
+import { playSound } from './playSound';
+import { startRecording, stopRecording } from './Recording';
 import { Socket } from './socket';
 
 type ConversationState =
@@ -9,8 +12,9 @@ type ConversationState =
   | {
       name: 'RUNNING';
       socket: Socket;
-      listeningController: ListeningController;
-      playbackController: PlaybackController;
+      turn:
+        | { name: 'USER_SPEAKING'; listeningController: ListeningController }
+        | { name: 'AGENT_SPEAKING'; playbackController: PlaybackController };
     }
   | { name: 'CLOSING' }
   | { name: 'CLOSED' }
@@ -38,13 +42,23 @@ export class ConversationController extends StateClass {
         removeListener = null;
       }
       if (state.name === 'RUNNING') {
-        const { listeningController, playbackController } = state;
-        listeningController.emitter.on('change', emitChange);
-        playbackController.emitter.on('change', emitChange);
-        removeListener = () => {
-          listeningController.emitter.off('change', emitChange);
-          playbackController.emitter.off('change', emitChange);
-        };
+        const { turn } = state;
+        switch (turn.name) {
+          case 'USER_SPEAKING': {
+            turn.listeningController.emitter.on('change', emitChange);
+            removeListener = () => {
+              turn.listeningController.emitter.off('change', emitChange);
+            };
+            break;
+          }
+          case 'AGENT_SPEAKING': {
+            turn.playbackController.emitter.on('change', emitChange);
+            removeListener = () => {
+              turn.playbackController.emitter.off('change', emitChange);
+            };
+            break;
+          }
+        }
       }
     });
   }
@@ -66,51 +80,225 @@ export class ConversationController extends StateClass {
     const socket = new Socket();
     await this.invoke(() => socket.open('/sockets/chat'));
     // TODO: Listen for socket close
-    void socket.send({ type: 'INIT' });
-    const message = await this.invoke(() =>
-      socket.waitForMessageOfType('READY'),
-    );
-    const playbackUrl = String(message.playbackUrl);
-    const startTime = Date.now();
-    const listeningController = new ListeningController({
-      socket,
-      onStarted: () => {
-        const timeElapsed = Date.now() - startTime;
-        console.log(`Listening started in ${timeElapsed}ms`);
-      },
-      onError: (error) => this.onError(error),
-      onDone: () => {
-        // TODO
-      },
-    });
-    const playbackController = new PlaybackController({
-      socket,
-      onStarted: () => {
-        const timeElapsed = Date.now() - startTime;
-        console.log(`Playback started in ${timeElapsed}ms`);
-      },
-      onError: (error) => this.onError(error),
-      onDone: () => {
-        // TODO
-      },
-    });
+    const message = await this.invoke(() => socket.waitForMessage());
+    const { type } = message;
+    if (type !== 'READY') {
+      throw new Error('Invalid ready message from server');
+    }
+    await this.startUserTurn(socket);
+  }
 
-    await this.invoke(() => {
-      return Promise.all([
-        listeningController.start(),
-        playbackController.start(playbackUrl),
-      ]);
-    });
-
-    this.state = {
-      name: 'RUNNING',
-      socket,
-      listeningController,
-      playbackController,
-    };
+  // TODO: Rename this?
+  stopListening() {
+    const { state } = this;
+    if (state.name !== 'RUNNING') {
+      return;
+    }
+    const { turn } = state;
+    if (turn.name !== 'USER_SPEAKING') {
+      return;
+    }
+    const { listeningController } = turn;
+    listeningController.stop();
   }
 
   onError(error: unknown) {
     this.state = { name: 'ERROR', error };
+  }
+
+  async startUserTurn(socket: Socket) {
+    const listeningController = new ListeningController({
+      socket,
+      onError: (error) => this.onError(error),
+      onDone: () => {
+        void this.startAgentTurn(socket);
+      },
+    });
+    this.state = {
+      name: 'RUNNING',
+      socket,
+      turn: { name: 'USER_SPEAKING', listeningController },
+    };
+    await this.invoke(() => listeningController.start());
+  }
+
+  async startAgentTurn(socket: Socket) {
+    const playbackController = new PlaybackController({
+      socket,
+      onError: (error) => this.onError(error),
+      onDone: () => {
+        void this.startUserTurn(socket);
+      },
+    });
+    this.state = {
+      name: 'RUNNING',
+      socket,
+      turn: { name: 'AGENT_SPEAKING', playbackController },
+    };
+    await this.invoke(() => playbackController.start());
+  }
+}
+
+class ListeningController extends StateClass {
+  socket: Socket;
+  state:
+    | { name: 'NONE' }
+    | { name: 'INITIALIZING' }
+    | { name: 'ERROR'; error: string }
+    | { name: 'LISTENING' }
+    | { name: 'STOPPING' };
+  onError: (error: unknown) => void;
+  onDone: () => void;
+
+  constructor(init: {
+    socket: Socket;
+    onError: (error: unknown) => void;
+    onDone: () => void;
+  }) {
+    super();
+    const { socket, onError, onDone } = init;
+    this.socket = socket;
+    this.state = { name: 'NONE' };
+    this.onError = onError;
+    this.onDone = onDone;
+  }
+
+  async start() {
+    this.state = { name: 'INITIALIZING' };
+    void this.socket.send({ type: 'START_UPLOAD_STREAM' });
+    // { type: 'START_UPLOAD_STREAM_RESULT', success: true } | { type: 'START_UPLOAD_STREAM_RESULT', success: false, error: string }
+    const message = await this.socket.waitForMessageOfType(
+      'START_UPLOAD_STREAM_RESULT',
+    );
+    if (!message.success) {
+      const errorMessage = String(message.error);
+      this.state = { name: 'ERROR', error: errorMessage };
+      this.onError(errorMessage);
+      return;
+    }
+    // TODO: abort when we transition out of state LISTENING?
+    const abortController = new AbortController();
+    void this.socket
+      .waitForMessageOfType('STOP_UPLOAD_STREAM', {
+        timeout: 0,
+        signal: abortController.signal,
+      })
+      .then(() => {
+        this.stop();
+      });
+    const result = await safeInvoke(() => startRecording());
+    if (!result.ok) {
+      const errorMessage = String(result.error);
+      this.state = { name: 'ERROR', error: errorMessage };
+      this.onError(errorMessage);
+      return;
+    }
+    void this.socket.send({ type: 'RECORDING_STARTED' });
+    console.log('>> Started listening...');
+    this.state = { name: 'LISTENING' };
+    const readableStream = result.result;
+    this.sendStream(readableStream)
+      .then(() => {
+        // This means we called stopRecording(), e.g. from a STOP_UPLOAD_STREAM message from the server
+        this.onDone();
+      })
+      .catch((error: unknown) => {
+        // This means either the recording errored or a websocket issue
+        this.state = { name: 'ERROR', error: String(error) };
+        this.onError(error);
+      })
+      .finally(() => {
+        // Stop listening for the STOP_UPLOAD_STREAM message from server
+        abortController.abort();
+      });
+  }
+
+  stop() {
+    // This will cause the sendStream to finish up, calling onDone.
+    void stopRecording();
+  }
+
+  private async sendStream(readableStream: AsyncGenerator<string, undefined>) {
+    const { socket } = this;
+    // TODO: Use for..await
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition, no-constant-condition
+    while (true) {
+      const { value, done } = await readableStream.next();
+      if (value) {
+        await socket.send({ type: 'AUDIO_CHUNK', value });
+      }
+      if (done) {
+        break;
+      }
+    }
+    await socket.send({ type: 'AUDIO_DONE' });
+  }
+}
+
+class PlaybackController extends StateClass {
+  socket: Socket;
+  state:
+    | { name: 'NONE' }
+    | { name: 'INITIALIZING' }
+    | { name: 'ERROR'; error: string }
+    | { name: 'PLAYING' };
+  onError: (error: unknown) => void;
+  onDone: () => void;
+
+  constructor(init: {
+    socket: Socket;
+    onError: (error: unknown) => void;
+    onDone: () => void;
+  }) {
+    super();
+    const { socket, onError, onDone } = init;
+    this.socket = socket;
+    this.state = { name: 'NONE' };
+    this.onError = onError;
+    this.onDone = onDone;
+  }
+
+  // TODO: We should not use polling like this with WebSockets
+  private async waitForReady() {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition, no-constant-condition
+    while (true) {
+      void this.socket.send({ type: 'START_PLAYBACK' });
+      const message = await this.socket.waitForMessageOfType(
+        'START_PLAYBACK_RESULT',
+      );
+      if (message.status === 'TRY_AGAIN') {
+        await sleep(100);
+        continue;
+      }
+      return message;
+    }
+  }
+
+  async start() {
+    this.state = { name: 'INITIALIZING' };
+    // { type: 'START_PLAYBACK_RESULT', status: 'TRY_AGAIN' } | { type: 'START_PLAYBACK_RESULT', status: 'READY', playbackUrl: string } | { type: 'START_PLAYBACK_RESULT', status: 'ERROR', error: string }
+    const message = await this.waitForReady();
+    if (message.status === 'ERROR') {
+      const errorMessage = String(message.error);
+      this.state = { name: 'ERROR', error: errorMessage };
+      this.onError(errorMessage);
+      return;
+    }
+    // TODO: Change state; enable cancel button in UI
+    const playbackUrl = String(message.playbackUrl);
+    const startTime = Date.now();
+    console.log('Starting playback...');
+    void this.socket.send({ type: 'PLAYBACK_INIT' });
+    const _sound = await playSound({
+      uri: API_BASE_URL + playbackUrl,
+      onDone: () => {
+        const timeElapsed = Date.now() - startTime;
+        console.log(`Playback complete in ${timeElapsed}ms`);
+        this.onDone();
+      },
+    });
+    const timeElapsed = Date.now() - startTime;
+    console.log(`Playback started in ${timeElapsed}ms`);
+    void this.socket.send({ type: 'PLAYBACK_STARTED' });
   }
 }
