@@ -102,6 +102,12 @@ export class TextToSpeechController {
       return;
     }
     eventLogger.event('tts_connected');
+    setInterval(() => {
+      const date = new Date();
+      const minutes = date.getMinutes();
+      const seconds = date.getSeconds();
+      this.write(`${minutes} minutes and ${seconds} seconds. `);
+    }, 5000);
   }
 
   private send(text: string, isFinal = false) {

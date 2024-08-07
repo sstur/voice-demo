@@ -130,7 +130,6 @@ export class DeepgramConnection {
         }
         this.receivedCharCount += text.length;
         this.receivedChunkCount += 1;
-        logger.log('>> Text:', JSON.stringify(text));
         if (text) {
           this.onText(text);
         }

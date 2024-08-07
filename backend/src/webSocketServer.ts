@@ -46,7 +46,8 @@ wss.on('connection', (socket) => {
       case 'INIT': {
         const transcriber = new DeepgramConnection({
           onText: (text) => {
-            textToSpeechController.write(text);
+            logger.log('>> Text:', JSON.stringify(text));
+            // textToSpeechController.write(text);
           },
           onError: (error) => onError(error),
           onDone: () => {
