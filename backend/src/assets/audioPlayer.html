@@ -15,10 +15,20 @@
       let mediaSourceReady = false;
 
       document.addEventListener('DOMContentLoaded', () => {
-        // TODO: Consider if this should return a promise
-        // Should we load some chunks of audio into the queue first?
-        setupMediaSource();
-        send({ type: 'READY' });
+        const button = document.createElement('button');
+        button.appendChild(document.createTextNode('Start'));
+        document.body.appendChild(button);
+        button.addEventListener('click', () => {
+          button.remove();
+          try {
+            // TODO: Consider if this should return a promise
+            // Should we load some chunks of audio into the queue first?
+            setupMediaSource();
+          } catch (e) {
+            log({ error: String(e) });
+          }
+          send({ type: 'READY' });
+        });
       });
 
       window.addEventListener('message', (event) => {
