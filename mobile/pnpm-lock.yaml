@@ -47,6 +47,9 @@ dependencies:
   expo-status-bar:
     specifier: ~1.12.1
     version: 1.12.1
+  expo-web-browser:
+    specifier: ~13.0.3
+    version: 13.0.3(expo@51.0.17)
   react:
     specifier: 18.2.0
     version: 18.2.0
@@ -6270,6 +6273,14 @@ packages:
 
   /expo-status-bar@1.12.1:
     resolution: {integrity: sha512-/t3xdbS8KB0prj5KG5w7z+wZPFlPtkgs95BsmrP/E7Q0xHXTcDcQ6Cu2FkFuRM+PKTb17cJDnLkawyS5vDLxMA==}
+    dev: false
+
+  /expo-web-browser@13.0.3(expo@51.0.17):
+    resolution: {integrity: sha512-HXb7y82ApVJtqk8tManyudtTrCtx8xcUnVzmJECeHCB0SsWSQ+penVLZxJkcyATWoJOsFMnfVSVdrTcpKKGszQ==}
+    peerDependencies:
+      expo: '*'
+    dependencies:
+      expo: 51.0.17(@babel/core@7.24.7)(@babel/preset-env@7.24.7)
     dev: false
 
   /expo@51.0.17(@babel/core@7.24.7)(@babel/preset-env@7.24.7):

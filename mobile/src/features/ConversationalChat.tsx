@@ -1,54 +1,25 @@
-import { useEffect, useReducer, useState } from 'react';
+import { useState } from 'react';
+import type { WebBrowserResult } from 'expo-web-browser';
+import { openBrowserAsync } from 'expo-web-browser';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { YStack } from 'tamagui';
 
-import { Button, Text, VStack } from '../components/core';
-import { ConversationController } from '../recording/conversation';
-
-type State =
-  | { name: 'IDLE' }
-  | { name: 'CONVERSATION_ONGOING'; controller: ConversationController };
+import { Button, Text } from '../components/core';
 
 export function ConversationalChat() {
-  const [state, setState] = useState<State>({ name: 'IDLE' });
-  const [_, forceUpdate] = useReducer((x: number) => x + 1, 0);
+  const [result, setResult] = useState<WebBrowserResult | null>(null);
+  const safeAreaInsets = useSafeAreaInsets();
 
-  // Subscribe to updates on the conversation controller
-  useEffect(() => {
-    if (state.name === 'CONVERSATION_ONGOING') {
-      const { controller } = state;
-      controller.emitter.on('change', forceUpdate);
-      return () => {
-        controller.emitter.off('change', forceUpdate);
-      };
-    }
-  }, [state, forceUpdate]);
-
+  const handlePressButtonAsync = async () => {
+    const result = await openBrowserAsync(
+      'https://aura-tts-demo.deepgram.com/',
+    );
+    setResult(result);
+  };
   return (
-    <VStack flex={1} justifyContent="center" alignItems="center">
-      {state.name === 'IDLE' ? (
-        <>
-          <Text>{t('Ready')}</Text>
-          <Button
-            onPress={() => {
-              const controller = new ConversationController();
-              setState({ name: 'CONVERSATION_ONGOING', controller });
-              void controller.start();
-            }}
-          >
-            {t('Start')}
-          </Button>
-        </>
-      ) : (
-        <>
-          <Text>{t('Running...')}</Text>
-          <Button
-            onPress={() => {
-              // TODO: state.controller.stop()
-            }}
-          >
-            {t('Done Talking')}
-          </Button>
-        </>
-      )}
-    </VStack>
+    <YStack flex={1} ai="center" jc="center" pt={safeAreaInsets.top}>
+      <Button onPress={handlePressButtonAsync}>{t('Open Web Browser')}</Button>
+      <Text>{result && JSON.stringify(result)}</Text>
+    </YStack>
   );
 }
