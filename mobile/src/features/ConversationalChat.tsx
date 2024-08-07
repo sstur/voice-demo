@@ -5,7 +5,7 @@ import { parseMessage } from '../support/parseMessage';
 import { sleep } from '../support/sleep';
 
 // This must be a multiple of 16 because it will be decoded from base64 (x / 4 * 3) then converted into float32 frames (x / 4).
-const CHUNK_SIZE = 16 * 512;
+const CHUNK_SIZE = 32 * 1024;
 
 export function ConversationalChat() {
   const webViewRef = useRef<WebView>(null);

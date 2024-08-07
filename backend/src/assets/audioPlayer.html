@@ -16,6 +16,9 @@
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       const audioContext = new AudioContext();
 
+      const audioQueue = [];
+      let isPlaying = false;
+
       document.addEventListener('DOMContentLoaded', () => {
         const button = document.createElement('button');
         button.appendChild(document.createTextNode('Start'));
@@ -35,8 +38,8 @@
           }
           case 'AUDIO_CHUNK': {
             const chunk = fromBase64(data.value);
-            log('>> Playing chunk of length', chunk.byteLength);
-            playPCM(new Float32Array(chunk));
+            log('>> Enqueueing chunk of length', chunk.byteLength);
+            enqueueAudioChunk(new Float32Array(chunk));
             break;
           }
           case 'AUDIO_DONE': {
@@ -46,30 +49,37 @@
         }
       });
 
-      function playPCM(float32Array) {
+      function enqueueAudioChunk(float32Array) {
         const audioBuffer = audioContext.createBuffer(
           1, // mono channel
           float32Array.length,
           16000, // sample rate
         );
         audioBuffer.getChannelData(0).set(float32Array);
+        audioQueue.push(audioBuffer);
+        if (!isPlaying) {
+          playNextChunk();
+        }
+      }
+
+      function playNextChunk() {
+        if (audioQueue.length === 0) {
+          isPlaying = false;
+          return;
+        }
+        const audioBuffer = audioQueue.shift();
         const source = audioContext.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(audioContext.destination);
+        source.addEventListener('ended', () => {
+          playNextChunk();
+        });
         source.start();
-      }
-
-      function toBinaryString(str) {
-        try {
-          return atob(str);
-        } catch (e) {
-          log({ error: String(e), str });
-        }
-        return '';
+        isPlaying = true;
       }
 
       function fromBase64(str) {
-        const binaryString = toBinaryString(str);
+        const binaryString = atob(str);
         const bytes = Uint8Array.from(binaryString, (ch) => ch.charCodeAt(0));
         return bytes.buffer;
       }
