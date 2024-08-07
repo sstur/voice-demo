@@ -1,3 +1,4 @@
+export const audioPlayerWebViewHtml = `
 <!doctype html>
 <html lang="en">
   <head>
@@ -96,3 +97,4 @@
     </script>
   </body>
 </html>
+`.trim();
