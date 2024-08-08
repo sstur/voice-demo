@@ -281,6 +281,7 @@ class PlaybackController extends StateClass {
   }
 }
 
+// TODO: I don't think we can do it this way because we're not buffering the messages
 async function* getAudioStream(socket: Socket): AsyncIterableIterator<string> {
   void socket.send({ type: 'START_PLAYBACK' });
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
