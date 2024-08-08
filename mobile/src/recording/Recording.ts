@@ -69,12 +69,13 @@ export async function stopRecording() {
   recordingState.current = { name: 'STOPPING' };
   const { recording, file } = state;
   try {
+    // This can never throw, so there's not really any use in the try/finally
     await stopAndUnloadAsync(recording);
   } finally {
     recordingState.current = { name: 'IDLE' };
+    // This indicates that we're done done writing to the file.
+    file.close();
   }
-  // This indicates that we're done done writing to the file.
-  file.close();
 }
 
 async function stopAndUnloadAsync(recording: Audio.Recording) {
