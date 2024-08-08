@@ -7,6 +7,9 @@ export const audioPlayerWebViewHtml = `
   </head>
   <body>
     <script>
+      const CHANNELS = 1;
+      const SAMPLE_RATE = 16000;
+
       window.addEventListener('error', (event) => {
         log({ error: String(event.error) });
       });
@@ -18,6 +21,8 @@ export const audioPlayerWebViewHtml = `
       const audioContext = new AudioContext();
 
       const audioQueue = [];
+      let inputStreamFinished = false;
+      let bufferedFrames = 0;
       let isPlaying = false;
 
       document.addEventListener('DOMContentLoaded', () => {
@@ -33,12 +38,11 @@ export const audioPlayerWebViewHtml = `
           }
           case 'AUDIO_CHUNK': {
             const chunk = fromBase64(data.value);
-            log('>> Enqueueing chunk of length', chunk.byteLength);
             enqueueAudioChunk(new Float32Array(chunk));
             break;
           }
           case 'AUDIO_DONE': {
-            // TODO: Teardown audioContext?
+            inputStreamFinished = true;
             break;
           }
         }
@@ -46,12 +50,13 @@ export const audioPlayerWebViewHtml = `
 
       function enqueueAudioChunk(float32Array) {
         const audioBuffer = audioContext.createBuffer(
-          1, // mono channel
+          CHANNELS,
           float32Array.length,
-          16000, // sample rate
+          SAMPLE_RATE,
         );
         audioBuffer.getChannelData(0).set(float32Array);
         audioQueue.push(audioBuffer);
+        bufferedFrames += audioBuffer.length;
         if (!isPlaying) {
           playNextChunk();
         }
@@ -60,9 +65,13 @@ export const audioPlayerWebViewHtml = `
       function playNextChunk() {
         if (audioQueue.length === 0) {
           isPlaying = false;
+          if (inputStreamFinished) {
+            send({ type: 'PLAYBACK_COMPLETE' });
+          }
           return;
         }
         const audioBuffer = audioQueue.shift();
+        bufferedFrames -= audioBuffer.length;
         const source = audioContext.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(audioContext.destination);

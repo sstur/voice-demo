@@ -11,7 +11,7 @@ import { parseMessage } from './support/parseMessage';
 type ConversationState =
   | { name: 'IDLE' }
   | { name: 'RECEIVING_AUDIO'; transcriber: DeepgramConnection }
-  | { name: 'FINALIZING_TRANSCRIPTION' }
+  | { name: 'FINALIZING_TRANSCRIPTION'; startStreamingWhenDone: boolean }
   | { name: 'AGENT_WORKING'; agentController: AgentController }
   | { name: 'AGENT_DONE' }
   | { name: 'CLOSED' }
@@ -35,6 +35,13 @@ wss.on('connection', (socket) => {
     socket.send(JSON.stringify(message));
   };
 
+  const streamAudioToSocket = async (readStream: AsyncIterable<string>) => {
+    for await (const chunk of readStream) {
+      send({ type: 'AUDIO_CHUNK', value: chunk, done: false });
+    }
+    send({ type: 'AUDIO_CHUNK', value: '', done: true });
+  };
+
   socket.on('message', (data, isBinary) => {
     // Not currently supporting binary messages
     if (isBinary) {
@@ -45,14 +52,6 @@ wss.on('connection', (socket) => {
     switch (payload.type) {
       case 'RECORDING_STARTED': {
         eventLogger.event('client_recording_started');
-        break;
-      }
-      case 'PLAYBACK_INIT': {
-        eventLogger.event('client_playback_init');
-        break;
-      }
-      case 'PLAYBACK_STARTED': {
-        eventLogger.event('client_playback_started');
         break;
       }
       case 'START_UPLOAD_STREAM': {
@@ -85,8 +84,15 @@ wss.on('connection', (socket) => {
                 eventLogger.dumpEventsRelative();
               },
             });
+            const prevState = state.current;
             state.current = { name: 'AGENT_WORKING', agentController };
             void agentController.start();
+            if (
+              prevState.name === 'FINALIZING_TRANSCRIPTION' &&
+              prevState.startStreamingWhenDone
+            ) {
+              void streamAudioToSocket(agentController.outputQueue);
+            }
           })
           .catch((_error: unknown) => {
             // TODO
@@ -109,7 +115,10 @@ wss.on('connection', (socket) => {
       case 'AUDIO_DONE': {
         if (state.current.name === 'RECEIVING_AUDIO') {
           const { transcriber } = state.current;
-          state.current = { name: 'FINALIZING_TRANSCRIPTION' };
+          state.current = {
+            name: 'FINALIZING_TRANSCRIPTION',
+            startStreamingWhenDone: false,
+          };
           transcriber.done();
         }
         break;
@@ -118,27 +127,21 @@ wss.on('connection', (socket) => {
         const currentState = state.current;
         switch (currentState.name) {
           case 'FINALIZING_TRANSCRIPTION': {
-            send({ type: 'START_PLAYBACK_RESULT', status: 'TRY_AGAIN' });
+            state.current = {
+              name: 'FINALIZING_TRANSCRIPTION',
+              startStreamingWhenDone: true,
+            };
             break;
           }
           case 'AGENT_WORKING': {
             const { agentController } = currentState;
-            const playbackUrl = agentController.getOutputUrl();
-            send({
-              type: 'START_PLAYBACK_RESULT',
-              status: 'READY',
-              playbackUrl,
-            });
+            void streamAudioToSocket(agentController.outputQueue);
             break;
           }
           default: {
             const errorMsg = `Unable to start playback in state ${currentState.name}`;
             logger.warn(errorMsg);
-            send({
-              type: 'START_PLAYBACK_RESULT',
-              status: 'ERROR',
-              error: errorMsg,
-            });
+            // TODO: Send error
           }
         }
         break;

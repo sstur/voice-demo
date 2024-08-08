@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { AudioPlaybackProvider } from './AudioPlaybackProvider';
 import { FontProvider } from './FontProvider';
 import { LocalStorageProvider } from './LocalStorageProvider';
 import { ReactQueryProvider } from './ReactQueryProvider';
@@ -16,7 +17,9 @@ export function AppProvider(props: Props) {
     <FontProvider>
       <ThemeProvider>
         <LocalStorageProvider onInitialized={onInitialized}>
-          <ReactQueryProvider>{children}</ReactQueryProvider>
+          <ReactQueryProvider>
+            <AudioPlaybackProvider>{children}</AudioPlaybackProvider>
+          </ReactQueryProvider>
         </LocalStorageProvider>
       </ThemeProvider>
     </FontProvider>

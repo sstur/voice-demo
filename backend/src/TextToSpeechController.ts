@@ -1,5 +1,3 @@
-import { spawn } from 'child_process';
-
 import type {
   WebSocketBaseResponse,
   WebSocketResponse as WebSocketResponseWithoutDone,
@@ -10,10 +8,6 @@ import { CARTESIA_KEY } from './support/constants';
 import { eventLogger } from './support/EventLogger';
 import { logger } from './support/Logger';
 import { parseMessage } from './support/parseMessage';
-
-// Keep these in sync with the ffmpeg output settings below
-export const OUTPUT_FORMAT_CONTENT_TYPE = 'audio/aac';
-export const OUTPUT_FILE_NAME = 'audio.aac';
 
 // Not sure why the done response is not included in the types provided
 type WebSocketDoneResponse = WebSocketBaseResponse & { type: 'done' };
@@ -32,7 +26,7 @@ export class TextToSpeechController {
   state: State = { name: 'NONE' };
   inputStream: AsyncIterableIterator<string>;
   contextId: string;
-  onAudioChunk: (chunk: Buffer) => void;
+  onAudioChunk: (chunk: string) => void;
   onError: (error: unknown) => void;
   onFinalTextResponse: (content: string) => void;
   onDone: () => void;
@@ -40,7 +34,7 @@ export class TextToSpeechController {
   constructor(init: {
     inputStream: AsyncIterableIterator<string>;
     contextId: string;
-    onAudioChunk: (chunk: Buffer) => void;
+    onAudioChunk: (chunk: string) => void;
     onError: (error: unknown) => void;
     onFinalTextResponse: (content: string) => void;
     onDone: () => void;
@@ -64,40 +58,11 @@ export class TextToSpeechController {
   async start() {
     const { inputStream, contextId, onAudioChunk, onError, onDone } = this;
 
-    const ffmpeg = spawn(
-      'ffmpeg',
-      [
-        ['-f', 's16le'],
-        ['-ar', '44100'],
-        ['-ac', '1'],
-        ['-i', '-'],
-        ['-c:a', 'aac'],
-        ['-f', 'adts'],
-        '-',
-      ].flat(),
-    );
-
-    ffmpeg.stdout.on('data', (chunk: Buffer) => {
-      onAudioChunk(chunk);
-    });
-
-    ffmpeg.stdout.on('error', (error) => {
-      onError(error);
-      this.state = { name: 'ERROR', error };
-    });
-
-    ffmpeg.on('close', (code) => {
-      if (code !== 0) {
-        logger.warn(`FFmpeg process exited with code ${code}`);
-      }
-      onDone();
-    });
-
     eventLogger.event('tts_init');
     const websocket = cartesia.tts.websocket({
       container: 'raw',
-      encoding: 'pcm_s16le',
-      sampleRate: 44100,
+      encoding: 'pcm_f32le',
+      sampleRate: 16000,
     });
 
     try {
@@ -125,7 +90,7 @@ export class TextToSpeechController {
             const error = new Error(message.error);
             onError(error);
             this.state = { name: 'ERROR', error };
-            ffmpeg.kill();
+            onDone();
             break;
           }
           // A data chunk will look like: { "status_code": 206, "done": false, "type": "chunk", "data": "....", "step_time": 55.578796, "context_id": "..." }
@@ -134,8 +99,7 @@ export class TextToSpeechController {
               eventLogger.event('tts_first_audio_received');
               hasReceivedAudio = true;
             }
-            const chunk = Buffer.from(message.data, 'base64');
-            ffmpeg.stdin.write(chunk);
+            onAudioChunk(message.data);
             break;
           }
           // A timestamps message will look like: { "status_code": 206, "done": false, "type": "timestamps", "word_timestamps": { "words": ["Hello"], "start": [0.0], "end": [1.0] }, "context_id": "..." }
@@ -159,7 +123,7 @@ export class TextToSpeechController {
         }
       }
       if (this.state.name !== 'ERROR') {
-        ffmpeg.stdin.end();
+        onDone();
       }
     };
 

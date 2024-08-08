@@ -1,8 +1,6 @@
-import { API_BASE_URL } from '../support/constants';
+import type { AudioPlaybackContext } from '../context/AudioPlayback';
 import { safeInvoke } from '../support/safeInvoke';
-import { sleep } from '../support/sleep';
 import { StateClass } from '../support/StateClass';
-import { playSound } from './playSound';
 import { startRecording, stopRecording } from './Recording';
 import { Socket } from './socket';
 
@@ -22,9 +20,11 @@ type ConversationState =
 
 export class ConversationController extends StateClass {
   state: ConversationState = { name: 'STOPPED' };
+  audioPlaybackContext: AudioPlaybackContext;
 
-  constructor() {
+  constructor(init: { audioPlaybackContext: AudioPlaybackContext }) {
     super();
+    this.audioPlaybackContext = init.audioPlaybackContext;
     let removeListener: (() => void) | null = null;
     let isEmitting = false;
     const emitChange = () => {
@@ -123,8 +123,10 @@ export class ConversationController extends StateClass {
   }
 
   async startAgentTurn(socket: Socket) {
+    const { audioPlaybackContext } = this;
     const playbackController = new PlaybackController({
       socket,
+      audioPlaybackContext,
       onError: (error) => this.onError(error),
       onDone: () => {
         void this.startUserTurn(socket);
@@ -237,6 +239,7 @@ class ListeningController extends StateClass {
 
 class PlaybackController extends StateClass {
   socket: Socket;
+  audioPlaybackContext: AudioPlaybackContext;
   state:
     | { name: 'NONE' }
     | { name: 'INITIALIZING' }
@@ -247,58 +250,48 @@ class PlaybackController extends StateClass {
 
   constructor(init: {
     socket: Socket;
+    audioPlaybackContext: AudioPlaybackContext;
     onError: (error: unknown) => void;
     onDone: () => void;
   }) {
     super();
-    const { socket, onError, onDone } = init;
+    const { socket, audioPlaybackContext, onError, onDone } = init;
     this.socket = socket;
+    this.audioPlaybackContext = audioPlaybackContext;
     this.state = { name: 'NONE' };
     this.onError = onError;
     this.onDone = onDone;
   }
 
-  // TODO: We should not use polling like this with WebSockets
-  private async waitForReady() {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition, no-constant-condition
-    while (true) {
-      void this.socket.send({ type: 'START_PLAYBACK' });
-      const message = await this.socket.waitForMessageOfType(
-        'START_PLAYBACK_RESULT',
-      );
-      if (message.status === 'TRY_AGAIN') {
-        await sleep(100);
-        continue;
-      }
-      return message;
-    }
-  }
-
   async start() {
     this.state = { name: 'INITIALIZING' };
-    // { type: 'START_PLAYBACK_RESULT', status: 'TRY_AGAIN' } | { type: 'START_PLAYBACK_RESULT', status: 'READY', playbackUrl: string } | { type: 'START_PLAYBACK_RESULT', status: 'ERROR', error: string }
-    const message = await this.waitForReady();
-    if (message.status === 'ERROR') {
-      const errorMessage = String(message.error);
-      this.state = { name: 'ERROR', error: errorMessage };
-      this.onError(errorMessage);
-      return;
-    }
+    const audioStream = getAudioStream(this.socket);
     // TODO: Change state; enable cancel button in UI
-    const playbackUrl = String(message.playbackUrl);
     const startTime = Date.now();
     console.log('Starting playback...');
-    void this.socket.send({ type: 'PLAYBACK_INIT' });
-    const _sound = await playSound({
-      uri: API_BASE_URL + playbackUrl,
+    const _sound = await this.audioPlaybackContext.playSound(audioStream, {
+      channels: 1,
+      sampleRate: 16000,
       onDone: () => {
         const timeElapsed = Date.now() - startTime;
         console.log(`Playback complete in ${timeElapsed}ms`);
         this.onDone();
       },
     });
-    const timeElapsed = Date.now() - startTime;
-    console.log(`Playback started in ${timeElapsed}ms`);
-    void this.socket.send({ type: 'PLAYBACK_STARTED' });
+  }
+}
+
+async function* getAudioStream(socket: Socket): AsyncIterableIterator<string> {
+  void socket.send({ type: 'START_PLAYBACK' });
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  while (true) {
+    const message = await socket.waitForMessageOfType('AUDIO_CHUNK');
+    const chunk = message.value;
+    if (typeof chunk === 'string' && chunk.length) {
+      yield chunk;
+    }
+    if (message.done) {
+      break;
+    }
   }
 }

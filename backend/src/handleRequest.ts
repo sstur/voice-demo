@@ -1,15 +1,11 @@
-import { playbackHandler } from './handlers/playbackHandler';
-
+// eslint-disable-next-line @typescript-eslint/require-await
 export async function handleRequest(
   pathname: string,
-  request: Request,
+  _request: Request,
 ): Promise<Response> {
   switch (true) {
     case pathname === '/': {
       return new Response('Hello World!');
-    }
-    case pathname.startsWith('/playback/'): {
-      return await playbackHandler(request);
     }
   }
   return new Response('Not Found', { status: 404 });
