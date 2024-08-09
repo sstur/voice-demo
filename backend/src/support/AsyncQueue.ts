@@ -6,16 +6,15 @@ type EventMap = {
   close: [];
 };
 
-export class AsyncQueue<T> implements AsyncIterable<T> {
+export class AsyncQueue<T> implements AsyncIterableIterator<T> {
   private chunks: Array<T> = [];
   private isClosed = false;
-  emitter = new EventEmitter<EventMap>();
+  private emitter = new EventEmitter<EventMap>();
 
-  private async read(index: number): Promise<IteratorResult<T, undefined>> {
-    const { chunks } = this;
+  async next(): Promise<IteratorResult<T, undefined>> {
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition, no-constant-condition
     while (true) {
-      const value = chunks[index];
+      const value = this.chunks.shift();
       if (value !== undefined) {
         this.emitter.emit('read');
         return { done: false, value };
@@ -44,13 +43,6 @@ export class AsyncQueue<T> implements AsyncIterable<T> {
   }
 
   [Symbol.asyncIterator]() {
-    let index = 0;
-    const iterator: AsyncIterableIterator<T> = {
-      next: async (): Promise<IteratorResult<T, undefined>> => {
-        return await this.read(index++);
-      },
-      [Symbol.asyncIterator]: () => iterator,
-    };
-    return iterator;
+    return this;
   }
 }
