@@ -149,6 +149,8 @@ export class TextToSpeechController {
           // id: 'b7d50908-b17c-442d-ad8d-810c63997ed9', // California Girl
           // id: 'c2ac25f9-ecc4-4f56-9095-651354df60c0', // Commercial Lady
           // id: '5c42302c-194b-4d0c-ba1a-8cb485c84ab9', // Female Nurse
+          // id: '156fb8d2-335b-4950-9cb3-a2d33befec77', // Helpful Woman
+          // id: '18bbf178-4921-45cf-b9e1-81f05a4588f2', // Pi clone
           id: '11af83e2-23eb-452f-956e-7fee218ccb5c',
         },
         transcript: text,
