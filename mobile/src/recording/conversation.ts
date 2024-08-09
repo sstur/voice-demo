@@ -1,6 +1,8 @@
+import chime from '../../assets/chime-1.wav';
 import type { AudioPlaybackContext } from '../context/AudioPlayback';
 import { safeInvoke } from '../support/safeInvoke';
 import { StateClass } from '../support/StateClass';
+import { playSound } from './playSound';
 import { startRecording, stopRecording } from './Recording';
 import { Socket } from './socket';
 
@@ -88,19 +90,19 @@ export class ConversationController extends StateClass {
     await this.startUserTurn(socket);
   }
 
-  // TODO: Rename this?
-  stopListening() {
-    const { state } = this;
-    if (state.name !== 'RUNNING') {
-      return;
-    }
-    const { turn } = state;
-    if (turn.name !== 'USER_SPEAKING') {
-      return;
-    }
-    const { listeningController } = turn;
-    listeningController.stop();
-  }
+  // TODO: Remove this?
+  // stopListening() {
+  //   const { state } = this;
+  //   if (state.name !== 'RUNNING') {
+  //     return;
+  //   }
+  //   const { turn } = state;
+  //   if (turn.name !== 'USER_SPEAKING') {
+  //     return;
+  //   }
+  //   const { listeningController } = turn;
+  //   listeningController.stop();
+  // }
 
   onError(error: unknown) {
     this.state = { name: 'ERROR', error };
@@ -110,7 +112,9 @@ export class ConversationController extends StateClass {
     const listeningController = new ListeningController({
       socket,
       onError: (error) => this.onError(error),
-      onDone: () => {
+      onDone: async () => {
+        const sound = await playSound(chime);
+        await sound.wait();
         void this.startAgentTurn(socket);
       },
     });
