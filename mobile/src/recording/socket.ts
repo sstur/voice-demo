@@ -47,11 +47,6 @@ export class Socket {
     await flush(ws);
   }
 
-  async waitForMessage(options: WaitForMessageOptions = {}) {
-    const ws = this.getWebSocket('waitForMessage');
-    return await waitForMessage(ws, undefined, options);
-  }
-
   async waitForMessageOfType(
     type: string,
     options: WaitForMessageOptions = {},

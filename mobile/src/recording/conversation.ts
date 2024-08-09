@@ -82,11 +82,7 @@ export class ConversationController extends StateClass {
     const socket = new Socket();
     await this.invoke(() => socket.open('/sockets/chat'));
     // TODO: Listen for socket close
-    const message = await this.invoke(() => socket.waitForMessage());
-    const { type } = message;
-    if (type !== 'READY') {
-      throw new Error('Invalid ready message from server');
-    }
+    await this.invoke(() => socket.waitForMessageOfType('READY'));
     await this.startUserTurn(socket);
   }
 
