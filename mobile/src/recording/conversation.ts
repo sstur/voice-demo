@@ -1,6 +1,5 @@
 import chime from '../../assets/chime-2.wav';
 import type { AudioPlaybackContext } from '../context/AudioPlayback';
-import { AsyncQueue } from '../support/AsyncQueue';
 import { StateClass } from '../support/StateClass';
 import { ListeningController } from './ListeningController';
 import { PlaybackController } from './PlaybackController';
