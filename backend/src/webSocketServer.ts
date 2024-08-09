@@ -39,7 +39,7 @@ wss.on('connection', (socket) => {
     for await (const chunk of readStream) {
       send({ type: 'AUDIO_CHUNK', value: chunk, done: false });
     }
-    send({ type: 'AUDIO_CHUNK', value: '', done: true });
+    send({ type: 'AUDIO_CHUNK', done: true });
   };
 
   socket.on('message', (data, isBinary) => {
