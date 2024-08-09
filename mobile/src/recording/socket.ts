@@ -1,6 +1,7 @@
 /**
  * TODO: Consider replacing createListenerManager with something like promise.race
  */
+import { AsyncQueue } from '../support/AsyncQueue';
 import { API_BASE_URL } from '../support/constants';
 import { sleep } from '../support/sleep';
 import { createListenerManager } from '../websockets/createListenerManager';
@@ -49,6 +50,40 @@ export class Socket {
   async waitForMessage(type: string, options: WaitForMessageOptions = {}) {
     const ws = this.getWebSocket('waitForMessage');
     return await waitForMessage(ws, type, options);
+  }
+
+  getIterableStream<T>(
+    type: string,
+    toResult: (message: Message) => IteratorResult<T, undefined>,
+  ): AsyncIterableIterator<T> {
+    const asyncQueue = new AsyncQueue<T>();
+    const ws = this.getWebSocket('getIterable');
+    // TODO: use AbortController to remove listeners?
+    const onClose = (_event: CloseEvent) => {
+      cleanupEventListeners();
+      asyncQueue.close();
+    };
+    ws.addEventListener('close', onClose);
+    const onMessage = (event: MessageEvent) => {
+      const data: unknown = event.data;
+      const message: Message = typeof data === 'string' ? safeParse(data) : {};
+      if (message.type === type) {
+        const { value, done } = toResult(message);
+        if (value !== undefined) {
+          void asyncQueue.write(value);
+        }
+        if (done) {
+          cleanupEventListeners();
+          asyncQueue.close();
+        }
+      }
+    };
+    ws.addEventListener('message', onMessage);
+    const cleanupEventListeners = () => {
+      ws.removeEventListener('message', onMessage);
+      ws.removeEventListener('close', onClose);
+    };
+    return asyncQueue;
   }
 
   async close() {

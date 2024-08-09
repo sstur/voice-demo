@@ -1,9 +1,8 @@
 import type { AudioPlaybackContext } from '../context/AudioPlayback';
 import { StateClass } from '../support/StateClass';
-import type { Socket } from './socket';
 
 export class PlaybackController extends StateClass {
-  socket: Socket;
+  audioStream: AsyncIterable<string>;
   audioPlaybackContext: AudioPlaybackContext;
   state:
     | { name: 'NONE' }
@@ -14,14 +13,14 @@ export class PlaybackController extends StateClass {
   onDone: () => void;
 
   constructor(init: {
-    socket: Socket;
+    audioStream: AsyncIterable<string>;
     audioPlaybackContext: AudioPlaybackContext;
     onError: (error: unknown) => void;
     onDone: () => void;
   }) {
     super();
-    const { socket, audioPlaybackContext, onError, onDone } = init;
-    this.socket = socket;
+    const { audioStream, audioPlaybackContext, onError, onDone } = init;
+    this.audioStream = audioStream;
     this.audioPlaybackContext = audioPlaybackContext;
     this.state = { name: 'NONE' };
     this.onError = onError;
@@ -30,7 +29,7 @@ export class PlaybackController extends StateClass {
 
   async start() {
     this.state = { name: 'INITIALIZING' };
-    const audioStream = getAudioStream(this.socket);
+    const audioStream = this.audioStream;
     // TODO: Change state; enable cancel button in UI
     const startTime = Date.now();
     console.log('Starting playback...');
@@ -43,21 +42,5 @@ export class PlaybackController extends StateClass {
         this.onDone();
       },
     });
-  }
-}
-
-// TODO: I don't think we can do it this way because we're not buffering the messages
-async function* getAudioStream(socket: Socket): AsyncIterableIterator<string> {
-  void socket.send({ type: 'START_PLAYBACK' });
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  while (true) {
-    const message = await socket.waitForMessage('AUDIO_CHUNK');
-    const chunk = message.value;
-    if (typeof chunk === 'string' && chunk.length) {
-      yield chunk;
-    }
-    if (message.done) {
-      break;
-    }
   }
 }

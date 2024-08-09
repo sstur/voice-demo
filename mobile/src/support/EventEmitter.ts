@@ -18,6 +18,13 @@ export class EventEmitter<
     };
   }
 
+  once<K extends keyof E>(key: K, listener: Listener<E[K]>) {
+    const remove = this.addListener(key, (...args) => {
+      remove();
+      listener(...args);
+    });
+  }
+
   off<K extends keyof E>(key: K, listener: Listener<E[K]>) {
     this.removeListener(key, listener);
   }

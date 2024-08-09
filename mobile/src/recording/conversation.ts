@@ -1,5 +1,6 @@
 import chime from '../../assets/chime-2.wav';
 import type { AudioPlaybackContext } from '../context/AudioPlayback';
+import { AsyncQueue } from '../support/AsyncQueue';
 import { StateClass } from '../support/StateClass';
 import { ListeningController } from './ListeningController';
 import { PlaybackController } from './PlaybackController';
@@ -100,17 +101,15 @@ export class ConversationController extends StateClass {
   //   listeningController.stop();
   // }
 
-  onError(error: unknown) {
+  private onError(error: unknown) {
     this.state = { name: 'ERROR', error };
   }
 
-  async startUserTurn(socket: Socket) {
+  private async startUserTurn(socket: Socket) {
     const listeningController = new ListeningController({
       socket,
       onError: (error) => this.onError(error),
-      onDone: async () => {
-        const sound = await playSound(chime);
-        await sound.wait();
+      onDone: () => {
         void this.startAgentTurn(socket);
       },
     });
@@ -122,10 +121,18 @@ export class ConversationController extends StateClass {
     await this.invoke(() => listeningController.start());
   }
 
-  async startAgentTurn(socket: Socket) {
+  private async playInterstitialSound() {
+    const sound = await playSound(chime);
+    await sound.wait();
+  }
+
+  private async startAgentTurn(socket: Socket) {
     const { audioPlaybackContext } = this;
+    const audioStream = getAudioStream(socket);
+    // TODO: At this point we're still in the USER_SPEAKING state; should we be in a transition state?
+    await this.invoke(() => this.playInterstitialSound());
     const playbackController = new PlaybackController({
-      socket,
+      audioStream,
       audioPlaybackContext,
       onError: (error) => this.onError(error),
       onDone: () => {
@@ -139,4 +146,15 @@ export class ConversationController extends StateClass {
     };
     await this.invoke(() => playbackController.start());
   }
+}
+
+function getAudioStream(socket: Socket): AsyncIterable<string> {
+  const stream = socket.getIterableStream<string>('AUDIO_CHUNK', (message) => {
+    const { value, done } = message;
+    return done
+      ? { value: undefined, done: true }
+      : { value: String(value), done: false };
+  });
+  void socket.send({ type: 'START_PLAYBACK' });
+  return stream;
 }
