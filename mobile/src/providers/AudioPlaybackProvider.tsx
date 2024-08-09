@@ -38,6 +38,9 @@ function AudioPlaybackWebView(props: { audioClip: AudioClip }) {
     send({ type: 'AUDIO_DONE' });
   };
 
+  const { channels, sampleRate } = audioClip.options;
+  const html = htmlWithParams({ channels, sampleRate });
+
   // TODO: Send options.channels and options.sampleRate to webView
   return (
     <View style={{ height: 0 }}>
@@ -45,7 +48,7 @@ function AudioPlaybackWebView(props: { audioClip: AudioClip }) {
         ref={webViewRef}
         style={{ height: 0 }}
         originWhitelist={['*']}
-        source={{ html: audioPlayerWebViewHtml }}
+        source={{ html }}
         onMessage={(event) => {
           const data = parseMessage(event.nativeEvent.data);
           switch (data.type) {
@@ -118,5 +121,12 @@ export function AudioPlaybackProvider(props: { children: ReactNode }) {
         {props.children}
       </View>
     </AudioPlaybackContextProvider>
+  );
+}
+
+function htmlWithParams(inputParams: { channels: number; sampleRate: number }) {
+  return audioPlayerWebViewHtml.replace(
+    'const inputParams = {}',
+    `const inputParams = ${JSON.stringify(inputParams)}`,
   );
 }
