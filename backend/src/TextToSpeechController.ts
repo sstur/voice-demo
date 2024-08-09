@@ -5,6 +5,7 @@ import type {
 import Cartesia from '@cartesia/cartesia-js';
 
 import { CARTESIA_KEY } from './support/constants';
+import { createId } from './support/createId';
 import { eventLogger } from './support/EventLogger';
 import { logger } from './support/Logger';
 import { parseMessage } from './support/parseMessage';
@@ -33,22 +34,15 @@ export class TextToSpeechController {
 
   constructor(init: {
     inputStream: AsyncIterableIterator<string>;
-    contextId: string;
     onAudioChunk: (chunk: string) => void;
     onError: (error: unknown) => void;
     onFinalTextResponse: (content: string) => void;
     onDone: () => void;
   }) {
-    const {
-      inputStream,
-      contextId,
-      onAudioChunk,
-      onError,
-      onFinalTextResponse,
-      onDone,
-    } = init;
+    const { inputStream, onAudioChunk, onError, onFinalTextResponse, onDone } =
+      init;
     this.inputStream = inputStream;
-    this.contextId = contextId;
+    this.contextId = createId();
     this.onAudioChunk = onAudioChunk;
     this.onError = onError;
     this.onFinalTextResponse = onFinalTextResponse;
