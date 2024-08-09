@@ -1,4 +1,4 @@
-import chime from '../../assets/chime-1.wav';
+import chime from '../../assets/chime-2.wav';
 import type { AudioPlaybackContext } from '../context/AudioPlayback';
 import { safeInvoke } from '../support/safeInvoke';
 import { StateClass } from '../support/StateClass';
