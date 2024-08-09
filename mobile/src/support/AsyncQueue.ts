@@ -1,13 +1,40 @@
+// TODO: Sync this with the other one
 import { EventEmitter } from './EventEmitter';
 
 type EventMap = {
-  write: [];
+  change: [];
 };
+
+const WRITE_TIMEOUT = 5000;
+
+class WriteTimeoutError extends Error {
+  constructor() {
+    super('Timeout exceeded waiting for write to AsyncQueue');
+  }
+}
 
 export class AsyncQueue<T> implements AsyncIterableIterator<T> {
   private chunks: Array<T> = [];
   private isClosed = false;
   private emitter = new EventEmitter<EventMap>();
+
+  private async waitForChange() {
+    let timeout: TimeoutId | undefined;
+    await Promise.race([
+      new Promise<void>((resolve) => {
+        this.emitter.once('change', () => {
+          clearTimeout(timeout);
+          resolve();
+        });
+      }),
+      new Promise<void>((resolve, reject) => {
+        timeout = setTimeout(
+          () => reject(new WriteTimeoutError()),
+          WRITE_TIMEOUT,
+        );
+      }),
+    ]);
+  }
 
   async next(): Promise<IteratorResult<T, undefined>> {
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition, no-constant-condition
@@ -19,7 +46,7 @@ export class AsyncQueue<T> implements AsyncIterableIterator<T> {
       if (this.isClosed) {
         break;
       }
-      await new Promise<void>((resolve) => this.emitter.once('write', resolve));
+      await this.waitForChange();
     }
     return { done: true, value: undefined };
   }
@@ -28,14 +55,14 @@ export class AsyncQueue<T> implements AsyncIterableIterator<T> {
   async write(value: T) {
     if (!this.isClosed) {
       this.chunks.push(value);
-      this.emitter.emit('write');
+      this.emitter.emit('change');
     }
   }
 
   close() {
     this.isClosed = true;
-    // Emitting "write" here in case next above is waiting for it
-    this.emitter.emit('write');
+    // Emitting "change" here in case next above is waiting for it
+    this.emitter.emit('change');
   }
 
   [Symbol.asyncIterator]() {
