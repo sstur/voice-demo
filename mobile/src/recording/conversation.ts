@@ -82,7 +82,7 @@ export class ConversationController extends StateClass {
     const socket = new Socket();
     await this.invoke(() => socket.open('/sockets/chat'));
     // TODO: Listen for socket close
-    await this.invoke(() => socket.waitForMessageOfType('READY'));
+    await this.invoke(() => socket.waitForMessage('READY'));
     await this.startUserTurn(socket);
   }
 
@@ -169,7 +169,7 @@ class ListeningController extends StateClass {
     this.state = { name: 'INITIALIZING' };
     void this.socket.send({ type: 'START_UPLOAD_STREAM' });
     // { type: 'START_UPLOAD_STREAM_RESULT', success: true } | { type: 'START_UPLOAD_STREAM_RESULT', success: false, error: string }
-    const message = await this.socket.waitForMessageOfType(
+    const message = await this.socket.waitForMessage(
       'START_UPLOAD_STREAM_RESULT',
     );
     if (!message.success) {
@@ -181,7 +181,7 @@ class ListeningController extends StateClass {
     // TODO: abort when we transition out of state LISTENING?
     const abortController = new AbortController();
     void this.socket
-      .waitForMessageOfType('STOP_UPLOAD_STREAM', {
+      .waitForMessage('STOP_UPLOAD_STREAM', {
         timeout: 0,
         signal: abortController.signal,
       })
@@ -286,7 +286,7 @@ async function* getAudioStream(socket: Socket): AsyncIterableIterator<string> {
   void socket.send({ type: 'START_PLAYBACK' });
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   while (true) {
-    const message = await socket.waitForMessageOfType('AUDIO_CHUNK');
+    const message = await socket.waitForMessage('AUDIO_CHUNK');
     const chunk = message.value;
     if (typeof chunk === 'string' && chunk.length) {
       yield chunk;
