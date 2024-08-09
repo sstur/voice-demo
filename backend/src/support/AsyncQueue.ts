@@ -1,9 +1,7 @@
 import { EventEmitter } from 'events';
 
 type EventMap = {
-  read: [];
   write: [];
-  close: [];
 };
 
 export class AsyncQueue<T> implements AsyncIterableIterator<T> {
@@ -16,7 +14,6 @@ export class AsyncQueue<T> implements AsyncIterableIterator<T> {
     while (true) {
       const value = this.chunks.shift();
       if (value !== undefined) {
-        this.emitter.emit('read');
         return { done: false, value };
       }
       if (this.isClosed) {
@@ -37,9 +34,8 @@ export class AsyncQueue<T> implements AsyncIterableIterator<T> {
 
   close() {
     this.isClosed = true;
-    // Emitting "write" here in case read above is waiting for it
+    // Emitting "write" here in case next above is waiting for it
     this.emitter.emit('write');
-    this.emitter.emit('close');
   }
 
   [Symbol.asyncIterator]() {
