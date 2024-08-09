@@ -67,7 +67,6 @@ export const audioPlayerWebViewHtml = `
         const numFrames = Math.floor(chunk.byteLength / 4);
         const float32Array = new Float32Array(chunk, 0, numFrames);
         const leftoverCount = chunk.byteLength % 4;
-        log({ chunkSize: chunk.byteLength, leftoverCount });
         if (leftoverCount > 0) {
           partialFrame = chunk.slice(numFrames * 4);
         } else {
