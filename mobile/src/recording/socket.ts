@@ -1,7 +1,7 @@
 /**
  * TODO: Consider replacing createListenerManager with something like promise.race
  */
-import { AsyncQueue } from '../support/AsyncQueue';
+import { AudioQueue } from '../support/AudioQueue';
 import { API_BASE_URL } from '../support/constants';
 import { sleep } from '../support/sleep';
 import { createListenerManager } from '../websockets/createListenerManager';
@@ -52,11 +52,11 @@ export class Socket {
     return await waitForMessage(ws, type, options);
   }
 
-  getIterableStream<T>(
+  getIterableStream(
     type: string,
-    toResult: (message: Message) => IteratorResult<T, undefined>,
-  ): AsyncIterableIterator<T> {
-    const asyncQueue = new AsyncQueue<T>();
+    toResult: (message: Message) => IteratorResult<string, undefined>,
+  ): AsyncIterableIterator<string> {
+    const asyncQueue = new AudioQueue();
     const ws = this.getWebSocket('getIterable');
     // TODO: use AbortController to remove listeners?
     const onClose = (_event: CloseEvent) => {

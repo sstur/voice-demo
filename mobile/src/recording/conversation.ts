@@ -148,7 +148,7 @@ export class ConversationController extends StateClass {
 }
 
 function getAudioStream(socket: Socket): AsyncIterable<string> {
-  const stream = socket.getIterableStream<string>('AUDIO_CHUNK', (message) => {
+  const stream = socket.getIterableStream('AUDIO_CHUNK', (message) => {
     const { value, done } = message;
     return done
       ? { value: undefined, done: true }
