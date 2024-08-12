@@ -3,6 +3,7 @@ import './support/init';
 import { createServer } from 'http';
 import { Readable } from 'stream';
 
+import { wss as audioTestWss } from './audioTestWsServer';
 import { handleRequest } from './handleRequest';
 import { HttpError } from './support/HttpError';
 import { parseIncomingMessage } from './support/parseIncomingMessage';
@@ -12,10 +13,17 @@ const PORT = 8000;
 
 const server = createServer();
 
-server.on('upgrade', (request, socket, head) => {
-  wss.handleUpgrade(request, socket, head, (ws) => {
-    wss.emit('connection', ws, request);
-  });
+server.on('upgrade', (req, socket, head) => {
+  const url = new URL(req.url ?? '', 'http://localhost/');
+  if (url.pathname === '/sockets/audio-test') {
+    audioTestWss.handleUpgrade(req, socket, head, (ws) => {
+      audioTestWss.emit('connection', ws, req);
+    });
+  } else {
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      wss.emit('connection', ws, req);
+    });
+  }
 });
 
 server.on('request', (req, res) => {

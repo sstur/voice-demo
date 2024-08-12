@@ -60,6 +60,7 @@ wss.on('connection', (socket) => {
           .then((textFragments) => {
             // TODO: If result is empty, what should we do?
             const content = textFragments.join(' ');
+            // const content = 'tell me a short kids story about a dinosaur. about 3 paragraphs long';
             conversation.push({ role: 'user', content });
             // One potential flow is frontend sends AUDIO_DONE and we call
             // transcriber.done() which invokes this code path here.
