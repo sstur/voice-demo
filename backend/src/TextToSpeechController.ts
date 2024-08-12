@@ -183,7 +183,11 @@ export class TextToSpeechController {
         }
       }
     }
-    send(tokens.join(''), true);
+    const response = send(tokens.join(''), true);
+    if (!hasStartedStreaming) {
+      void beginStreaming(response.events('message'));
+      hasStartedStreaming = true;
+    }
     eventLogger.event('tts_all_text_sent');
     this.onFinalTextResponse(allTokens.join(''));
   }
