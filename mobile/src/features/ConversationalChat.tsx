@@ -1,64 +1,75 @@
-import { useState } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 
 import { Button, Text, VStack } from '../components/core';
 import { useAudioPlayback } from '../context/AudioPlayback';
-import { Socket } from '../recording/socket';
+import { ConversationController } from '../recording/conversation';
+
+type State =
+  | { name: 'IDLE' }
+  | { name: 'CONVERSATION_ONGOING'; controller: ConversationController };
 
 export function ConversationalChat() {
   const audioPlaybackContext = useAudioPlayback();
-  const [isPlaying, setPlaying] = useState(false);
+  const [state, setState] = useState<State>({ name: 'IDLE' });
+  const [_, forceUpdate] = useReducer((x: number) => x + 1, 0);
 
-  const playAudioFromServer = async () => {
-    const socket = new Socket();
-    await socket.open('/sockets/audio-test');
-    const audioStream = getAudioStream(socket);
-    await new Promise<void>((resolve) => {
-      void audioPlaybackContext.playSound(audioStream, {
-        channels: 1,
-        sampleRate: 16000,
-        onDone: () => {
-          console.log(`Playback complete.`);
-          resolve();
-        },
-      });
-    });
-    await socket.close();
+  // Subscribe to updates on the conversation controller
+  useEffect(() => {
+    if (state.name === 'CONVERSATION_ONGOING') {
+      const { controller } = state;
+      controller.emitter.on('change', forceUpdate);
+      return () => {
+        controller.emitter.off('change', forceUpdate);
+      };
+    }
+  }, [state, forceUpdate]);
+
+  const isTalking = () => {
+    if (state.name === 'CONVERSATION_ONGOING') {
+      const { controller } = state;
+      if (controller.state.name === 'RUNNING') {
+        const { turn } = controller.state;
+        return turn.name === 'USER_SPEAKING';
+      }
+    }
+    return false;
   };
 
   return (
     <VStack flex={1} justifyContent="center" alignItems="center">
-      {isPlaying ? (
-        <Text>{t('Playing...')}</Text>
-      ) : (
+      {state.name === 'IDLE' ? (
         <>
           <Text>{t('Ready')}</Text>
           <Button
             onPress={() => {
-              setPlaying(true);
-              playAudioFromServer()
-                .catch((error: unknown) => {
-                  console.error(error);
-                })
-                .finally(() => {
-                  setPlaying(false);
-                });
+              const controller = new ConversationController({
+                audioPlaybackContext,
+              });
+              setState({ name: 'CONVERSATION_ONGOING', controller });
+              void controller.start();
             }}
           >
-            {t('Play audio')}
+            {t('Start')}
           </Button>
+        </>
+      ) : (
+        <>
+          <Text>{t('Running...')}</Text>
+          {isTalking() ? (
+            <Button
+              onPress={() => {
+                const controller = new ConversationController({
+                  audioPlaybackContext,
+                });
+                setState({ name: 'CONVERSATION_ONGOING', controller });
+                void controller.start();
+              }}
+            >
+              {t('Done Talking')}
+            </Button>
+          ) : null}
         </>
       )}
     </VStack>
   );
-}
-
-function getAudioStream(socket: Socket): AsyncIterable<string> {
-  const stream = socket.getIterableStream<string>('AUDIO_CHUNK', (message) => {
-    const { value, done } = message;
-    return done
-      ? { value: undefined, done: true }
-      : { value: String(value), done: false };
-  });
-  void socket.send({ type: 'START_PLAYBACK' });
-  return stream;
 }
