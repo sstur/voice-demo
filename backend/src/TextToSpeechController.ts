@@ -1,6 +1,3 @@
-import { createWriteStream } from 'fs';
-import { resolve } from 'path';
-
 import type {
   WebSocketBaseResponse,
   WebSocketResponse as WebSocketResponseWithoutDone,
@@ -46,18 +43,10 @@ export class TextToSpeechController {
       init;
     this.inputStream = inputStream;
     this.contextId = createId();
-    const path = resolve(__dirname, `../../${Date.now()}.pcm`);
-    const fileWriteStream = createWriteStream(path);
-    this.onAudioChunk = (chunk) => {
-      fileWriteStream.write(Buffer.from(chunk, 'base64'));
-      onAudioChunk(chunk);
-    };
+    this.onAudioChunk = onAudioChunk;
     this.onError = onError;
     this.onFinalTextResponse = onFinalTextResponse;
-    this.onDone = () => {
-      fileWriteStream.close();
-      onDone();
-    };
+    this.onDone = onDone;
   }
 
   async start() {
