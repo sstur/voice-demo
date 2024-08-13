@@ -31,14 +31,10 @@ export class PlaybackController extends StateClass {
     this.state = { name: 'INITIALIZING' };
     const audioStream = this.audioStream;
     // TODO: Change state; enable cancel button in UI
-    const startTime = Date.now();
-    console.log('Starting playback...');
     const _sound = await this.audioPlaybackContext.playSound(audioStream, {
       channels: 1,
       sampleRate: 16000,
       onDone: () => {
-        const timeElapsed = Date.now() - startTime;
-        console.log(`Playback complete in ${timeElapsed}ms`);
         this.onDone();
       },
     });
