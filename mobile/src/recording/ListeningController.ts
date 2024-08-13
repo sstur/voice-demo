@@ -5,15 +5,16 @@ import { startRecording, stopRecording } from './Recording';
 import type { Socket } from './socket';
 
 export class ListeningController extends StateClass {
-  socket: Socket;
+  private socket: Socket;
   state:
     | { name: 'NONE' }
     | { name: 'INITIALIZING' }
-    | { name: 'ERROR'; error: string }
+    | { name: 'ERROR'; error: unknown }
     | { name: 'LISTENING' }
-    | { name: 'STOPPING' };
-  onError: (error: unknown) => void;
-  onDone: (transcription: string) => void;
+    | { name: 'STOPPED' };
+  private abortController: AbortController;
+  private onError: (error: unknown) => void;
+  private onDone: (transcription: string) => void;
 
   constructor(init: {
     socket: Socket;
@@ -24,11 +25,23 @@ export class ListeningController extends StateClass {
     const { socket, onError, onDone } = init;
     this.socket = socket;
     this.state = { name: 'NONE' };
-    this.onError = once(onError);
+    this.abortController = new AbortController();
+    this.onError = once((error) => {
+      this.state = { name: 'ERROR', error };
+      this.cleanup();
+      onError(error);
+    });
     this.onDone = once((transcription) => {
-      void stopRecording();
+      this.state = { name: 'STOPPED' };
+      this.cleanup();
       onDone(transcription);
     });
+  }
+
+  private cleanup() {
+    // Stop listening for the TRANSCRIPTION_COMPLETE message from server
+    this.abortController.abort();
+    void stopRecording();
   }
 
   async start() {
@@ -42,17 +55,15 @@ export class ListeningController extends StateClass {
       'START_UPLOAD_STREAM_RESULT',
     );
     if (!message.success) {
-      const errorMessage = String(message.error);
-      this.state = { name: 'ERROR', error: errorMessage };
-      this.onError(errorMessage);
+      this.onError(message.error);
       return;
     }
     // TODO: abort when we transition out of state LISTENING?
-    const abortController = new AbortController();
+    this.abortController = new AbortController();
     void this.socket
       .waitForMessage('TRANSCRIPTION_COMPLETE', {
         timeout: 0,
-        signal: abortController.signal,
+        signal: this.abortController.signal,
       })
       .then((message) => {
         const transcription = String(message.transcription);
@@ -60,9 +71,7 @@ export class ListeningController extends StateClass {
       });
     const result = await safeInvoke(() => startRecording());
     if (!result.ok) {
-      const errorMessage = String(result.error);
-      this.state = { name: 'ERROR', error: errorMessage };
-      this.onError(errorMessage);
+      this.onError(result.error);
       return;
     }
     void this.socket.send({ type: 'RECORDING_STARTED' });
@@ -70,16 +79,10 @@ export class ListeningController extends StateClass {
     console.log(`>> Started listening in ${timeElapsed}ms`);
     this.state = { name: 'LISTENING' };
     const readableStream = result.result;
-    this.sendStream(readableStream)
-      .catch((error: unknown) => {
-        // This means either the recording errored or a websocket issue
-        this.state = { name: 'ERROR', error: String(error) };
-        this.onError(error);
-      })
-      .finally(() => {
-        // Stop listening for the TRANSCRIPTION_COMPLETE message from server
-        abortController.abort();
-      });
+    this.sendStream(readableStream).catch((error: unknown) => {
+      // This means either the recording errored or a websocket issue
+      this.onError(error);
+    });
   }
 
   private async sendStream(readableStream: AsyncGenerator<string, undefined>) {
