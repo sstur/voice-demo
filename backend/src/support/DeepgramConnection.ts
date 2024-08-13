@@ -30,6 +30,7 @@ export class DeepgramConnection implements AsyncIterable<string> {
 
     const url = new URL(DEEPGRAM_WSS_URL);
     url.searchParams.set('model', 'nova-2-conversationalai');
+    url.searchParams.set('smart_format', 'true');
     url.searchParams.set('endpointing', '400');
     const ws = new WebSocket(url, undefined, {
       headers: {
