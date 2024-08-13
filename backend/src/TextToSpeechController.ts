@@ -10,6 +10,12 @@ import { eventLogger } from './support/EventLogger';
 import { logger } from './support/Logger';
 import { parseMessage } from './support/parseMessage';
 
+// This should be a multiple of 4 since the samples are float32.
+// If too small this will cause stutter in playback; I'm not totally sure
+// why, but it's possibly related to the overhead of decoding and processing
+// WebSocket messages.
+const CHUNK_SIZE = 48 * 1024;
+
 // Not sure why the done response is not included in the types provided
 type WebSocketDoneResponse = WebSocketBaseResponse & { type: 'done' };
 type WebSocketResponse = WebSocketResponseWithoutDone | WebSocketDoneResponse;
@@ -71,6 +77,7 @@ export class TextToSpeechController {
 
     const beginStreaming = async (stream: AsyncIterableIterator<string>) => {
       let hasReceivedAudio = false;
+      let buffer = Buffer.from('');
       for await (const rawMessage of stream) {
         if (this.state.name === 'ERROR') {
           break;
@@ -93,7 +100,13 @@ export class TextToSpeechController {
               eventLogger.event('tts_first_audio_received');
               hasReceivedAudio = true;
             }
-            onAudioChunk(message.data);
+            const chunk = Buffer.from(message.data, 'base64');
+            buffer = Buffer.concat([buffer, chunk]);
+            while (buffer.length >= CHUNK_SIZE) {
+              const chunkToSend = buffer.subarray(0, CHUNK_SIZE);
+              buffer = buffer.subarray(CHUNK_SIZE);
+              onAudioChunk(chunkToSend.toString('base64'));
+            }
             break;
           }
           // A timestamps message will look like: { "status_code": 206, "done": false, "type": "timestamps", "word_timestamps": { "words": ["Hello"], "start": [0.0], "end": [1.0] }, "context_id": "..." }
@@ -104,6 +117,9 @@ export class TextToSpeechController {
           }
           // A done message will look like: { "status_code": 200, "done": true, "type": "done", "context_id": "..." }
           case 'done': {
+            if (buffer.length) {
+              onAudioChunk(buffer.toString('base64'));
+            }
             break;
           }
           default: {
