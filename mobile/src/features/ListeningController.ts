@@ -1,8 +1,8 @@
 import { once } from '../support/once';
+import { startRecording, stopRecording } from '../support/Recording';
 import { safeInvoke } from '../support/safeInvoke';
+import type { Socket } from '../support/socket';
 import { StateClass } from '../support/StateClass';
-import { startRecording, stopRecording } from './Recording';
-import type { Socket } from './socket';
 
 export class ListeningController extends StateClass {
   private socket: Socket;

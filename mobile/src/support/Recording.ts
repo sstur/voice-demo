@@ -1,9 +1,9 @@
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 
-import { File } from '../support/File';
 import { RECORDING_OPTIONS } from './constants';
 import { createAsyncReadable } from './createAsyncReadable';
+import { File } from './File';
 
 type RecordingState =
   | { name: 'IDLE' }

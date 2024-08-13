@@ -11,8 +11,8 @@
 
 import * as FileSystem from 'expo-file-system';
 
-import type { File } from '../support/File';
-import { sleep } from '../support/sleep';
+import type { File } from './File';
+import { sleep } from './sleep';
 
 const MAX_CHUNK_SIZE = 4 * 1024;
 

@@ -1,9 +1,9 @@
 import type { AVPlaybackSource, AVPlaybackStatus } from 'expo-av';
 import { Audio } from 'expo-av';
 
-import { EventEmitter } from '../support/EventEmitter';
-import { once } from '../support/once';
-import { sleep } from '../support/sleep';
+import { EventEmitter } from './EventEmitter';
+import { once } from './once';
+import { sleep } from './sleep';
 
 type EventMap = {
   playbackStatusUpdate: [status: AVPlaybackStatus];

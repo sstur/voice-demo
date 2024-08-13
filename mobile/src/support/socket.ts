@@ -1,11 +1,11 @@
 /**
  * TODO: Consider replacing createListenerManager with something like promise.race
  */
-import { AsyncQueue } from '../support/AsyncQueue';
-import { API_BASE_URL } from '../support/constants';
-import { sleep } from '../support/sleep';
-import { createListenerManager } from '../websockets/createListenerManager';
-import { toWebSocketUrl } from '../websockets/toWebSocketUrl';
+import { AsyncQueue } from './AsyncQueue';
+import { API_BASE_URL } from './constants';
+import { sleep } from './sleep';
+import { createListenerManager } from './websockets/createListenerManager';
+import { toWebSocketUrl } from './websockets/toWebSocketUrl';
 
 const MAX_WRITE_BUFFER = 64 * 1024;
 

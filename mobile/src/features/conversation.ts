@@ -1,10 +1,10 @@
 import chime from '../../assets/chime-2.wav';
 import type { AudioPlaybackContext } from '../context/AudioPlayback';
+import { createSound } from '../support/createSound';
+import { Socket } from '../support/socket';
 import { StateClass } from '../support/StateClass';
-import { createSound } from './createSound';
 import { ListeningController } from './ListeningController';
 import { PlaybackController } from './PlaybackController';
-import { Socket } from './socket';
 
 const chimePromise = createSound(chime);
 

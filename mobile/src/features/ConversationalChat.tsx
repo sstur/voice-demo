@@ -2,7 +2,7 @@ import { useEffect, useReducer, useState } from 'react';
 
 import { Button, Text, VStack } from '../components/core';
 import { useAudioPlayback } from '../context/AudioPlayback';
-import { ConversationController } from '../recording/conversation';
+import { ConversationController } from './conversation';
 
 type State =
   | { name: 'IDLE' }
