@@ -171,35 +171,29 @@ export class TextToSpeechController {
     };
 
     let hasStartedStreaming = false;
-    const tokens: Array<string> = [];
     const allTokens: Array<string> = [];
+    let textReceived = '';
     for await (const token of inputStream) {
       if (this.state.name === 'ERROR') {
         break;
       }
-      tokens.push(token);
+      textReceived += token;
       allTokens.push(token);
-      // Accumulate a few tokens before sending.
-      if (tokens.length > 4) {
-        const joined = tokens.join('');
-        tokens.length = 0;
-        const text = joined.replace(
-          /(\s*)(\S+)$/,
-          (_, space: string, token: string) => {
-            tokens.push(token);
-            return space;
-          },
-        );
-        if (text) {
-          const response = send(text);
+      // Accumulate a tokens into sentences before sending.
+      const sentences = textReceived.split(/[\r\n]+/);
+      while (sentences.length > 1) {
+        const sentence = sentences.shift();
+        if (sentence) {
+          const response = send(sentence + ' ');
           if (!hasStartedStreaming) {
             void beginStreaming(response.events('message'));
             hasStartedStreaming = true;
           }
         }
       }
+      textReceived = sentences.join('\n');
     }
-    const response = send(tokens.join(''), true);
+    const response = send(textReceived, true);
     if (!hasStartedStreaming) {
       void beginStreaming(response.events('message'));
       hasStartedStreaming = true;
