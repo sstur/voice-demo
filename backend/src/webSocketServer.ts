@@ -64,9 +64,8 @@ wss.on('connection', (socket) => {
             // One potential flow is frontend sends AUDIO_DONE and we call
             // transcriber.done() which invokes this code path here.
             // Alternatively if Deepgram identifies a period of silence it will
-            // invoke this code path and we need to tell the frontend to stop
-            // the recording.
-            send({ type: 'STOP_UPLOAD_STREAM' });
+            // invoke this code path.
+            send({ type: 'TRANSCRIPTION_COMPLETE', transcription: content });
             logger.log('Transcription complete:', JSON.stringify(content));
             const agentController = new AgentController({
               conversation,

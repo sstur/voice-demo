@@ -1,6 +1,8 @@
 import type { AVPlaybackSource } from 'expo-av';
 import { Audio } from 'expo-av';
 
+import { once } from '../support/once';
+
 export async function playSound(source: AVPlaybackSource) {
   const isLocal = typeof source === 'number' || !('uri' in source);
   const shouldDownloadFirst = !isLocal;
@@ -29,18 +31,5 @@ export async function playSound(source: AVPlaybackSource) {
   return {
     wait: () => promise,
     stop: () => unloadAsync(),
-  };
-}
-
-function once<A extends Array<unknown>>(
-  fn: (...args: A) => void,
-): (...args: A) => void {
-  let called = false;
-
-  return (...args: A) => {
-    if (!called) {
-      called = true;
-      fn(...args);
-    }
   };
 }
