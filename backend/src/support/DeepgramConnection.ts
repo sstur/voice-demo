@@ -30,6 +30,7 @@ export class DeepgramConnection implements AsyncIterable<string> {
 
     const url = new URL(DEEPGRAM_WSS_URL);
     url.searchParams.set('model', 'nova-2-conversationalai');
+    url.searchParams.set('endpointing', '400');
     const ws = new WebSocket(url, undefined, {
       headers: {
         Authorization: `Token ${DEEPGRAM_KEY}`,
@@ -110,9 +111,9 @@ export class DeepgramConnection implements AsyncIterable<string> {
   }
 
   private onMessage(message: Record<string, unknown>) {
-    const hasReceivedText = this.receivedCharCount > 0;
     switch (message.type) {
       case 'Results': {
+        const { channel: _, metadata, ...other } = message;
         // Should look like: { "type": "Results", "channel_index": [0, 1], "duration": 0.061875343, "start": 7.74, "is_final": true, "speech_final": false, "channel": { "alternatives": [{ "transcript": "...", "confidence": 1, "words": [{ "word": "foo", "start": 1.72, "end": 1.96, "confidence": 0.9970703 }] }] }, "metadata": { "request_id": "...", "model_uuid": "...", "model_info": { ... } }, "from_finalize": false }
         const channel = Object(message.channel);
         const result = Object(toArray(channel.alternatives)[0]);
@@ -124,14 +125,19 @@ export class DeepgramConnection implements AsyncIterable<string> {
         }
         this.receivedCharCount += text.length;
         this.receivedChunkCount += 1;
-        // TODO: Find a better way to detect pause?
-        if (text === '' && hasReceivedText) {
-          this.terminate();
-          break;
-        }
-        logger.log({ text });
+        logger.log({ text, ...other });
         if (text) {
           void this.asyncQueue.write(text);
+        }
+        const hasReceivedText = this.receivedCharCount > 0;
+        // We won't terminate this unless we've received at least some text. If
+        // we have received text and this particular message contains empty text
+        // then that indicates a fairly substantial silence so we can assume
+        // the user is done talking. More commonly though we'll get a
+        // speech_final and won't need to wait for such a large gap.
+        if (hasReceivedText && (text === '' || message.speech_final)) {
+          this.terminate();
+          break;
         }
         break;
       }
