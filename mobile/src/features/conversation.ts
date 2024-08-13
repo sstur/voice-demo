@@ -1,3 +1,5 @@
+import * as Haptics from 'expo-haptics';
+
 import chime from '../../assets/chime-2.wav';
 import type { AudioPlaybackContext } from '../context/AudioPlayback';
 import { createSound } from '../support/createSound';
@@ -5,6 +7,8 @@ import { Socket } from '../support/socket';
 import { StateClass } from '../support/StateClass';
 import { ListeningController } from './ListeningController';
 import { PlaybackController } from './PlaybackController';
+
+const { NotificationFeedbackType } = Haptics;
 
 const chimePromise = createSound(chime);
 
@@ -107,6 +111,9 @@ export class ConversationController extends StateClass {
   }
 
   private async startUserTurn(socket: Socket) {
+    // Ideally we should invoke this after the microphone has starts, but that
+    // doesn't seem to work. It seems to fail silently.
+    void Haptics.notificationAsync(NotificationFeedbackType.Success);
     const listeningController = new ListeningController({
       socket,
       onError: (error) => this.onError(error),

@@ -46,7 +46,6 @@ export class ListeningController extends StateClass {
 
   async start() {
     this.state = { name: 'INITIALIZING' };
-    const startTime = Date.now();
     // Next we're doing two things, telling the server to start and starting the local microphone.
     // TODO: Do these two things in parallel, aborting the other if one fails.
     void this.socket.send({ type: 'START_UPLOAD_STREAM' });
@@ -75,8 +74,6 @@ export class ListeningController extends StateClass {
       return;
     }
     void this.socket.send({ type: 'LOG_RECORDING_STARTED' });
-    const timeElapsed = Date.now() - startTime;
-    console.log(`>> Started listening in ${timeElapsed}ms`);
     this.state = { name: 'LISTENING' };
     const readableStream = result.result;
     this.sendStream(readableStream).catch((error: unknown) => {
