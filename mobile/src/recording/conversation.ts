@@ -1,10 +1,12 @@
 import chime from '../../assets/chime-2.wav';
 import type { AudioPlaybackContext } from '../context/AudioPlayback';
 import { StateClass } from '../support/StateClass';
+import { createSound } from './createSound';
 import { ListeningController } from './ListeningController';
 import { PlaybackController } from './PlaybackController';
-import { playSound } from './playSound';
 import { Socket } from './socket';
+
+const chimePromise = createSound(chime);
 
 type ConversationState =
   | { name: 'STOPPED' }
@@ -120,16 +122,16 @@ export class ConversationController extends StateClass {
     await this.invoke(() => listeningController.start());
   }
 
-  private async playInterstitialSound() {
-    const sound = await playSound(chime);
-    await sound.wait();
+  private async playChime() {
+    const sound = await chimePromise;
+    await sound.play({ wait: true });
   }
 
   private async startAgentTurn(socket: Socket) {
     const { audioPlaybackContext } = this;
     const audioStream = getAudioStream(socket);
     // TODO: At this point we're still in the USER_SPEAKING state; should we be in a transition state?
-    await this.invoke(() => this.playInterstitialSound());
+    await this.invoke(() => this.playChime());
     const playbackController = new PlaybackController({
       audioStream,
       audioPlaybackContext,
