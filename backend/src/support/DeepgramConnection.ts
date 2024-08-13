@@ -113,7 +113,6 @@ export class DeepgramConnection implements AsyncIterable<string> {
   private onMessage(message: Record<string, unknown>) {
     switch (message.type) {
       case 'Results': {
-        const { channel: _, metadata, ...other } = message;
         // Should look like: { "type": "Results", "channel_index": [0, 1], "duration": 0.061875343, "start": 7.74, "is_final": true, "speech_final": false, "channel": { "alternatives": [{ "transcript": "...", "confidence": 1, "words": [{ "word": "foo", "start": 1.72, "end": 1.96, "confidence": 0.9970703 }] }] }, "metadata": { "request_id": "...", "model_uuid": "...", "model_info": { ... } }, "from_finalize": false }
         const channel = Object(message.channel);
         const result = Object(toArray(channel.alternatives)[0]);
@@ -125,7 +124,6 @@ export class DeepgramConnection implements AsyncIterable<string> {
         }
         this.receivedCharCount += text.length;
         this.receivedChunkCount += 1;
-        logger.log({ text, ...other });
         if (text) {
           void this.asyncQueue.write(text);
         }
