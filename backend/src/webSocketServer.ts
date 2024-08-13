@@ -11,7 +11,10 @@ import { parseMessage } from './support/parseMessage';
 type ConversationState =
   | { name: 'IDLE' }
   | { name: 'RECEIVING_AUDIO'; transcriber: DeepgramConnection }
-  | { name: 'FINALIZING_TRANSCRIPTION'; startStreamingWhenDone: boolean }
+  | {
+      name: 'FINALIZING_TRANSCRIPTION';
+      whenDone: 'START_STREAMING' | 'STANDBY' | 'ABORT';
+    }
   | { name: 'AGENT_WORKING'; agentController: AgentController }
   | { name: 'AGENT_DONE' }
   | { name: 'CLOSED' }
@@ -88,7 +91,7 @@ wss.on('connection', (socket) => {
             void agentController.start();
             if (
               prevState.name === 'FINALIZING_TRANSCRIPTION' &&
-              prevState.startStreamingWhenDone
+              prevState.whenDone === 'START_STREAMING'
             ) {
               void streamAudioToSocket(agentController.outputQueue);
             }
@@ -116,7 +119,7 @@ wss.on('connection', (socket) => {
           const { transcriber } = state.current;
           state.current = {
             name: 'FINALIZING_TRANSCRIPTION',
-            startStreamingWhenDone: false,
+            whenDone: 'STANDBY',
           };
           transcriber.done();
         }
@@ -128,7 +131,7 @@ wss.on('connection', (socket) => {
           case 'FINALIZING_TRANSCRIPTION': {
             state.current = {
               name: 'FINALIZING_TRANSCRIPTION',
-              startStreamingWhenDone: true,
+              whenDone: 'START_STREAMING',
             };
             break;
           }
@@ -153,17 +156,39 @@ wss.on('connection', (socket) => {
 
   socket.on('error', (error) => {
     logger.log('Client connection error:', error);
-    if (state.current.name === 'RECEIVING_AUDIO') {
-      const { transcriber } = state.current;
-      transcriber.terminate();
+    switch (state.current.name) {
+      case 'RECEIVING_AUDIO': {
+        const { transcriber } = state.current;
+        transcriber.terminate();
+        break;
+      }
+      case 'FINALIZING_TRANSCRIPTION': {
+        state.current = { name: 'FINALIZING_TRANSCRIPTION', whenDone: 'ABORT' };
+        break;
+      }
+      case 'AGENT_WORKING': {
+        // TODO: Terminate agent
+        break;
+      }
     }
   });
 
   socket.on('close', () => {
     logger.log('Client connection closed.');
-    if (state.current.name === 'RECEIVING_AUDIO') {
-      const { transcriber } = state.current;
-      transcriber.terminate();
+    switch (state.current.name) {
+      case 'RECEIVING_AUDIO': {
+        const { transcriber } = state.current;
+        transcriber.terminate();
+        break;
+      }
+      case 'FINALIZING_TRANSCRIPTION': {
+        state.current = { name: 'FINALIZING_TRANSCRIPTION', whenDone: 'ABORT' };
+        break;
+      }
+      case 'AGENT_WORKING': {
+        // TODO: Terminate agent
+        break;
+      }
     }
   });
 
