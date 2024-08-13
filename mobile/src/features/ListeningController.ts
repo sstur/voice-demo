@@ -74,7 +74,7 @@ export class ListeningController extends StateClass {
       this.onError(result.error);
       return;
     }
-    void this.socket.send({ type: 'RECORDING_STARTED' });
+    void this.socket.send({ type: 'LOG_RECORDING_STARTED' });
     const timeElapsed = Date.now() - startTime;
     console.log(`>> Started listening in ${timeElapsed}ms`);
     this.state = { name: 'LISTENING' };

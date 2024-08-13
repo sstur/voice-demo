@@ -50,7 +50,7 @@ wss.on('connection', (socket) => {
     }
     const payload = parseMessage(toString(data));
     switch (payload.type) {
-      case 'RECORDING_STARTED': {
+      case 'LOG_RECORDING_STARTED': {
         eventLogger.event('client_recording_started');
         break;
       }
