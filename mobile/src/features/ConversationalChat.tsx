@@ -74,7 +74,7 @@ function ConversationPlaybackView(props: {
   const { captionsRef, playbackStartTimeRef, onStop, onCancel } = props;
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      <YStack flex={1} justifyContent="center" alignItems="center">
+      <YStack flex={1} justifyContent="center">
         <PlaybackCaptionView
           captionsRef={captionsRef}
           playbackStartTimeRef={playbackStartTimeRef}
