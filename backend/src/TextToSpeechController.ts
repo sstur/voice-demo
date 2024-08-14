@@ -1,4 +1,5 @@
 import type {
+  WebSocket,
   WebSocketBaseResponse,
   WebSocketResponse as WebSocketResponseWithoutDone,
 } from '@cartesia/cartesia-js';
@@ -25,18 +26,19 @@ const cartesia = new Cartesia({
 });
 
 type State =
-  | { name: 'NONE' }
-  | { name: 'RUNNING' }
-  | { name: 'ERROR'; error: unknown };
+  | { name: 'IDLE' }
+  | { name: 'RUNNING'; websocket: WebSocket }
+  | { name: 'ERROR'; error: unknown }
+  | { name: 'CLOSED' };
 
 export class TextToSpeechController {
-  state: State = { name: 'NONE' };
-  inputStream: AsyncIterableIterator<string>;
-  contextId: string;
-  onAudioChunk: (chunk: string) => void;
-  onError: (error: unknown) => void;
-  onFinalTextResponse: (content: string) => void;
-  onDone: () => void;
+  state: State = { name: 'IDLE' };
+  private inputStream: AsyncIterableIterator<string>;
+  private contextId: string;
+  private onAudioChunk: (chunk: string) => void;
+  private onError: (error: unknown) => void;
+  private onFinalTextResponse: (content: string) => void;
+  private onDone: () => void;
 
   constructor(init: {
     inputStream: AsyncIterableIterator<string>;
@@ -64,6 +66,8 @@ export class TextToSpeechController {
       encoding: 'pcm_f32le',
       sampleRate: 16000,
     });
+
+    this.state = { name: 'RUNNING', websocket };
 
     try {
       await websocket.connect();
@@ -133,6 +137,7 @@ export class TextToSpeechController {
         }
       }
       if (this.state.name !== 'ERROR') {
+        this.state = { name: 'CLOSED' };
         onDone();
       }
     };
@@ -174,7 +179,7 @@ export class TextToSpeechController {
     const allTokens: Array<string> = [];
     let textReceived = '';
     for await (const token of inputStream) {
-      if (this.state.name === 'ERROR') {
+      if (String(this.state.name) !== 'RUNNING') {
         break;
       }
       textReceived += token;
@@ -200,5 +205,14 @@ export class TextToSpeechController {
     }
     eventLogger.event('tts_all_text_sent');
     this.onFinalTextResponse(allTokens.join(''));
+  }
+
+  terminate() {
+    const { state } = this;
+    if (state.name === 'RUNNING') {
+      const { websocket } = state;
+      websocket.disconnect();
+      this.state = { name: 'CLOSED' };
+    }
   }
 }

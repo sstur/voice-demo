@@ -27,7 +27,11 @@ The user input has been transcribed from voice meaning that sometimes words migh
 You will use your best judgement to guess what the user meant, even if it is transcribed wrong.
 `.trim();
 
-export async function createAgentResponse(conversation: Array<Message>) {
+export async function createAgentResponse(
+  conversation: Array<Message>,
+  init: { abortSignal: AbortSignal },
+) {
+  const { abortSignal } = init;
   eventLogger.event('llm_init');
   const stream = await openai.chat.completions.create({
     model: 'gpt-4o',
@@ -45,6 +49,9 @@ export async function createAgentResponse(conversation: Array<Message>) {
   const getAsyncIterator = async function* (): AsyncIterableIterator<string> {
     let hasStarted = false;
     for await (const chunk of stream) {
+      if (abortSignal.aborted) {
+        break;
+      }
       const content = chunk.choices[0]?.delta?.content;
       if (content) {
         if (!hasStarted) {

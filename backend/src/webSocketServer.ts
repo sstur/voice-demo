@@ -61,6 +61,9 @@ wss.on('connection', (socket) => {
         const transcriber = deepgramPool.get();
         readEntireStream(transcriber)
           .then((textFragments) => {
+            if (state.current.name === 'CLOSED') {
+              return;
+            }
             // TODO: If result is empty, what should we do?
             const content = textFragments.join(' ');
             conversation.push({ role: 'user', content });
@@ -96,8 +99,9 @@ wss.on('connection', (socket) => {
               void streamAudioToSocket(agentController.outputQueue);
             }
           })
-          .catch((_error: unknown) => {
-            // TODO
+          .catch((error: unknown) => {
+            state.current = { name: 'ERROR', error };
+            // TODO: Cleanup
           });
         state.current = { name: 'RECEIVING_AUDIO', transcriber };
         send({ type: 'START_UPLOAD_STREAM_RESULT', success: true });
@@ -156,9 +160,10 @@ wss.on('connection', (socket) => {
 
   socket.on('error', (error) => {
     logger.log('Client connection error:', error);
-    switch (state.current.name) {
+    const currentState = state.current;
+    switch (currentState.name) {
       case 'RECEIVING_AUDIO': {
-        const { transcriber } = state.current;
+        const { transcriber } = currentState;
         transcriber.terminate();
         break;
       }
@@ -167,17 +172,20 @@ wss.on('connection', (socket) => {
         break;
       }
       case 'AGENT_WORKING': {
-        // TODO: Terminate agent
+        const { agentController } = currentState;
+        agentController.terminate();
         break;
       }
     }
+    state.current = { name: 'ERROR', error };
   });
 
   socket.on('close', () => {
     logger.log('Client connection closed.');
-    switch (state.current.name) {
+    const currentState = state.current;
+    switch (currentState.name) {
       case 'RECEIVING_AUDIO': {
-        const { transcriber } = state.current;
+        const { transcriber } = currentState;
         transcriber.terminate();
         break;
       }
@@ -186,10 +194,12 @@ wss.on('connection', (socket) => {
         break;
       }
       case 'AGENT_WORKING': {
-        // TODO: Terminate agent
+        const { agentController } = currentState;
+        agentController.terminate();
         break;
       }
     }
+    state.current = { name: 'CLOSED' };
   });
 
   send({ type: 'READY' });

@@ -4,10 +4,17 @@ import { createAgentResponse } from './agent';
 import { AsyncQueue } from './support/AsyncQueue';
 import { TextToSpeechController } from './TextToSpeechController';
 
+type State =
+  | { name: 'IDLE' }
+  | { name: 'RUNNING'; textToSpeechController: TextToSpeechController }
+  | { name: 'ERROR'; error: unknown }
+  | { name: 'CLOSED' };
+
 export class AgentController {
-  state: { name: 'NONE' } = { name: 'NONE' };
+  state: State = { name: 'IDLE' };
   private conversation: Array<Message>;
   outputQueue: AsyncQueue<string>;
+  private abortController: AbortController;
   private onError: (error: unknown) => void;
   private onFinalTextResponse: (content: string) => void;
   private onDone: () => void;
@@ -21,6 +28,7 @@ export class AgentController {
     const { conversation, onError, onFinalTextResponse, onDone } = init;
     this.conversation = conversation;
     this.outputQueue = new AsyncQueue<string>();
+    this.abortController = new AbortController();
     this.onError = onError;
     this.onFinalTextResponse = onFinalTextResponse;
     this.onDone = onDone;
@@ -28,7 +36,9 @@ export class AgentController {
 
   async start() {
     const { conversation, outputQueue, onError, onDone } = this;
-    const responseStream = await createAgentResponse(conversation);
+    const responseStream = await createAgentResponse(conversation, {
+      abortSignal: this.abortController.signal,
+    });
     const textToSpeechController = new TextToSpeechController({
       inputStream: responseStream,
       onFinalTextResponse: this.onFinalTextResponse,
@@ -36,14 +46,32 @@ export class AgentController {
         void outputQueue.write(chunk);
       },
       onError: (error) => {
-        outputQueue.close();
-        onError(error);
+        if (this.state.name === 'RUNNING') {
+          this.state = { name: 'ERROR', error };
+          outputQueue.close();
+          onError(error);
+        }
       },
       onDone: () => {
-        outputQueue.close();
-        onDone();
+        if (this.state.name === 'RUNNING') {
+          this.state = { name: 'CLOSED' };
+          outputQueue.close();
+          onDone();
+        }
       },
     });
+    this.state = { name: 'RUNNING', textToSpeechController };
     await textToSpeechController.start();
+  }
+
+  terminate() {
+    this.abortController.abort();
+    const { state, outputQueue } = this;
+    if (state.name === 'RUNNING') {
+      const { textToSpeechController } = state;
+      outputQueue.close();
+      textToSpeechController.terminate();
+      // TODO: Do we need to call onDone()?
+    }
   }
 }
