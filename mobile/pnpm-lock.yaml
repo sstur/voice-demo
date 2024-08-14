@@ -32,6 +32,9 @@ dependencies:
   expo-av:
     specifier: ~14.0.6
     version: 14.0.6(expo@51.0.17)
+  expo-camera:
+    specifier: ~15.0.14
+    version: 15.0.14(expo@51.0.17)
   expo-constants:
     specifier: ~16.0.2
     version: 16.0.2(expo@51.0.17)
@@ -6150,6 +6153,15 @@ packages:
       expo: '*'
     dependencies:
       expo: 51.0.17(@babel/core@7.24.7)(@babel/preset-env@7.24.7)
+    dev: false
+
+  /expo-camera@15.0.14(expo@51.0.17):
+    resolution: {integrity: sha512-O4uvVywGsQ3a89d0BX4lq6mDuGYGukx1PYY4QrC9zw1yzD2W9BVTl8lanFRPC5h4PRniekfeWUVH1a0jJmkLIw==}
+    peerDependencies:
+      expo: '*'
+    dependencies:
+      expo: 51.0.17(@babel/core@7.24.7)(@babel/preset-env@7.24.7)
+      invariant: 2.2.4
     dev: false
 
   /expo-constants@16.0.2(expo@51.0.17):

@@ -9,6 +9,7 @@ import { useAudioPlayback } from '../context/AudioPlayback';
 import { ConversationController } from './conversation';
 import { PlaybackCaptionView } from './PlaybackCaptionView';
 import type { Caption } from './types';
+import { VisionView } from './VisionView';
 
 type State =
   | { name: 'IDLE' }
@@ -46,7 +47,19 @@ function ConversationListeningView(props: {
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <YStack flex={1} justifyContent="center" alignItems="center">
-        <Paragraph>{t('Listening...')}</Paragraph>
+        {/* <Paragraph>{t('Listening...')}</Paragraph> */}
+        <VisionView
+          style={{ width: 180, height: 320 }}
+          onPhoto={(photo) => {
+            const { uri, width, height, base64 } = photo;
+            console.log('Took photo:', {
+              uri,
+              width,
+              height,
+              base64: base64?.length,
+            });
+          }}
+        />
       </YStack>
       <YStack>
         <XStack justifyContent="center" alignItems="center" gap={20} py={20}>
