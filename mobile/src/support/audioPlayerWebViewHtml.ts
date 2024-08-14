@@ -36,6 +36,14 @@ export const audioPlayerWebViewHtml = `
       let inputStreamFinished = false;
       let isPlaying = false;
 
+      const abortController = new AbortController();
+      abortController.signal.addEventListener('abort', () => {
+        audioQueue.length = 0;
+        partialFrame = null;
+        inputStreamFinished = true;
+        isPlaying = false;
+      });
+
       document.addEventListener('DOMContentLoaded', () => {
         send({ type: 'READY' });
       });
@@ -50,6 +58,10 @@ export const audioPlayerWebViewHtml = `
           case 'AUDIO_CHUNK': {
             const chunk = fromBase64(String(data.value));
             enqueueAudioChunk(chunk);
+            break;
+          }
+          case 'STOP': {
+            abortController.abort();
             break;
           }
           case 'AUDIO_DONE': {

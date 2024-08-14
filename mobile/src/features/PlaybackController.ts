@@ -52,6 +52,7 @@ export class PlaybackController extends StateClass {
     const sound = await this.audioPlaybackContext.playSound(audioStream, {
       channels: 1,
       sampleRate: 16000,
+      abortController: this.abortController,
       onStart: () => {
         this.playbackStartTimeRef.current = Date.now();
       },

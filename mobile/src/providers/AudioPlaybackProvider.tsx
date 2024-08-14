@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Audio } from 'expo-av';
 import { WebView } from 'react-native-webview';
@@ -21,12 +21,21 @@ type AudioClip = {
 
 function AudioPlaybackWebView(props: { audioClip: AudioClip }) {
   const { audioClip } = props;
-  const { channels, sampleRate, onStart, onDone } = audioClip.options;
+  const { channels, sampleRate, abortController, onStart, onDone } =
+    audioClip.options;
   const webViewRef = useRef<WebView>(null);
 
   const send = (data: Record<string, unknown>) => {
     webViewRef.current?.postMessage(JSON.stringify(data));
   };
+
+  useEffect(() => {
+    const onAbort = () => send({ type: 'STOP' });
+    abortController.signal.addEventListener('abort', onAbort);
+    return () => {
+      abortController.signal.removeEventListener('abort', onAbort);
+    };
+  }, [abortController]);
 
   const startStreaming = async () => {
     const { audioStream } = audioClip;
@@ -36,6 +45,9 @@ function AudioPlaybackWebView(props: { audioClip: AudioClip }) {
     // of 16 because it will be decoded from base64 (x / 4 * 3) then converted
     // into float32 frames (x / 4).
     for await (const chunk of audioStream) {
+      if (abortController.signal.aborted) {
+        break;
+      }
       if (!hasStarted) {
         onStart?.();
         hasStarted = true;
@@ -47,7 +59,6 @@ function AudioPlaybackWebView(props: { audioClip: AudioClip }) {
 
   const html = htmlWithParams({ channels, sampleRate });
 
-  // TODO: Send options.channels and options.sampleRate to webView
   return (
     <View style={{ height: 0 }}>
       <WebView
@@ -59,7 +70,9 @@ function AudioPlaybackWebView(props: { audioClip: AudioClip }) {
           const data = parseMessage(event.nativeEvent.data);
           switch (data.type) {
             case 'READY': {
-              void startStreaming();
+              if (!abortController.signal.aborted) {
+                void startStreaming();
+              }
               break;
             }
             case 'PLAYBACK_COMPLETE': {
