@@ -21,6 +21,7 @@ type AudioClip = {
 
 function AudioPlaybackWebView(props: { audioClip: AudioClip }) {
   const { audioClip } = props;
+  const { channels, sampleRate, onStart, onDone } = audioClip.options;
   const webViewRef = useRef<WebView>(null);
 
   const send = (data: Record<string, unknown>) => {
@@ -29,16 +30,21 @@ function AudioPlaybackWebView(props: { audioClip: AudioClip }) {
 
   const startStreaming = async () => {
     const { audioStream } = audioClip;
+    let hasStarted = false;
+
     // TODO: Each chunk must be a base64 encoded string whose length is multiple
     // of 16 because it will be decoded from base64 (x / 4 * 3) then converted
     // into float32 frames (x / 4).
     for await (const chunk of audioStream) {
+      if (!hasStarted) {
+        onStart?.();
+        hasStarted = true;
+      }
       send({ type: 'AUDIO_CHUNK', value: chunk });
     }
     send({ type: 'AUDIO_DONE' });
   };
 
-  const { channels, sampleRate } = audioClip.options;
   const html = htmlWithParams({ channels, sampleRate });
 
   // TODO: Send options.channels and options.sampleRate to webView
@@ -57,7 +63,7 @@ function AudioPlaybackWebView(props: { audioClip: AudioClip }) {
               break;
             }
             case 'PLAYBACK_COMPLETE': {
-              audioClip.options.onDone?.();
+              onDone?.();
               break;
             }
             case 'LOG': {

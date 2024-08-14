@@ -75,6 +75,9 @@ wss.on('connection', (socket) => {
             logger.log('Transcription complete:', JSON.stringify(content));
             const agentController = new AgentController({
               conversation,
+              onAudioMeta: ({ captions }) => {
+                send({ type: 'AUDIO_CAPTION', captions });
+              },
               onError: (error) => {
                 // TODO: Cleanup?
                 logger.error(error);

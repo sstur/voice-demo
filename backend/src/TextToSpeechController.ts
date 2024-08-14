@@ -31,11 +31,22 @@ type State =
   | { name: 'ERROR'; error: unknown }
   | { name: 'CLOSED' };
 
+type Caption = {
+  text: string;
+  startTime: number;
+  endTime: number;
+};
+
+export type AudioMetaData = {
+  captions: Array<Caption>;
+};
+
 export class TextToSpeechController {
   state: State = { name: 'IDLE' };
   private inputStream: AsyncIterableIterator<string>;
   private contextId: string;
   private onAudioChunk: (chunk: string) => void;
+  private onAudioMeta: (meta: AudioMetaData) => void;
   private onError: (error: unknown) => void;
   private onFinalTextResponse: (content: string) => void;
   private onDone: () => void;
@@ -43,15 +54,23 @@ export class TextToSpeechController {
   constructor(init: {
     inputStream: AsyncIterableIterator<string>;
     onAudioChunk: (chunk: string) => void;
+    onAudioMeta: (meta: AudioMetaData) => void;
     onError: (error: unknown) => void;
     onFinalTextResponse: (content: string) => void;
     onDone: () => void;
   }) {
-    const { inputStream, onAudioChunk, onError, onFinalTextResponse, onDone } =
-      init;
+    const {
+      inputStream,
+      onAudioChunk,
+      onAudioMeta,
+      onError,
+      onFinalTextResponse,
+      onDone,
+    } = init;
     this.inputStream = inputStream;
     this.contextId = createId();
     this.onAudioChunk = onAudioChunk;
+    this.onAudioMeta = onAudioMeta;
     this.onError = onError;
     this.onFinalTextResponse = onFinalTextResponse;
     this.onDone = onDone;
@@ -115,8 +134,15 @@ export class TextToSpeechController {
           }
           // A timestamps message will look like: { "status_code": 206, "done": false, "type": "timestamps", "word_timestamps": { "words": ["Hello"], "start": [0.0], "end": [1.0] }, "context_id": "..." }
           case 'timestamps': {
-            const words = message.word_timestamps.words.join(' ');
-            logger.log('>> Playing:', JSON.stringify(words));
+            const captions: Array<Caption> = [];
+            const { words, start, end } = message.word_timestamps;
+            for (const [i, text] of words.entries()) {
+              const startTime = toMs(start[i] ?? 0);
+              const endTime = toMs(end[i] ?? 0);
+              captions.push({ text, startTime, endTime });
+            }
+            this.onAudioMeta({ captions });
+            // logger.log('>> Playing:', JSON.stringify(words.join(' ')));
             break;
           }
           // A done message will look like: { "status_code": 200, "done": true, "type": "done", "context_id": "..." }
@@ -215,4 +241,8 @@ export class TextToSpeechController {
       this.state = { name: 'CLOSED' };
     }
   }
+}
+
+function toMs(seconds: number) {
+  return Math.round(seconds * 1000);
 }

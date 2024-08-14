@@ -7,6 +7,7 @@ export type PlaybackInstance = {
 export type PlaybackOptions = {
   channels: number;
   sampleRate: number;
+  onStart?: () => void;
   onDone?: () => void;
 };
 

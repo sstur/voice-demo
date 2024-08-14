@@ -1,3 +1,4 @@
+import type { MutableRefObject } from 'react';
 import { useEffect, useReducer, useState } from 'react';
 import { Play, Square, X } from '@tamagui/lucide-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,6 +14,8 @@ import {
 } from '../components/core';
 import { useAudioPlayback } from '../context/AudioPlayback';
 import { ConversationController } from './conversation';
+import { PlaybackCaptionView } from './PlaybackCaptionView';
+import type { Caption } from './types';
 
 type State =
   | { name: 'IDLE' }
@@ -46,6 +49,7 @@ function ConversationListeningView(props: {
   onStop: () => void;
   onCancel: () => void;
 }) {
+  const { onStop, onCancel } = props;
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <YStack flex={1} justifyContent="center" alignItems="center">
@@ -53,8 +57,8 @@ function ConversationListeningView(props: {
       </YStack>
       <YStack>
         <XStack justifyContent="center" alignItems="center" gap={20} py={20}>
-          <IconButton icon={Square} onPress={props.onStop} />
-          <IconButton icon={X} onPress={props.onCancel} />
+          <IconButton icon={Square} onPress={onStop} />
+          <IconButton icon={X} onPress={onCancel} />
         </XStack>
       </YStack>
     </SafeAreaView>
@@ -62,18 +66,24 @@ function ConversationListeningView(props: {
 }
 
 function ConversationPlaybackView(props: {
+  captionsRef: MutableRefObject<Array<Caption>>;
+  playbackStartTimeRef: MutableRefObject<number | null>;
   onStop: () => void;
   onCancel: () => void;
 }) {
+  const { captionsRef, playbackStartTimeRef, onStop, onCancel } = props;
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <YStack flex={1} justifyContent="center" alignItems="center">
-        <Paragraph>{t('Speaking...')}</Paragraph>
+        <PlaybackCaptionView
+          captionsRef={captionsRef}
+          playbackStartTimeRef={playbackStartTimeRef}
+        />
       </YStack>
       <YStack>
         <XStack justifyContent="center" alignItems="center" gap={20} py={20}>
-          <IconButton icon={Square} onPress={props.onStop} />
-          <IconButton icon={X} onPress={props.onCancel} />
+          <IconButton icon={Square} onPress={onStop} />
+          <IconButton icon={X} onPress={onCancel} />
         </XStack>
       </YStack>
     </SafeAreaView>
@@ -96,50 +106,54 @@ export function ConversationalChat() {
     }
   }, [state, forceUpdate]);
 
-  const isTalking = () => {
-    if (state.name === 'CONVERSATION_ONGOING') {
-      const { controller } = state;
-      if (controller.state.name === 'RUNNING') {
-        const { turn } = controller.state;
-        return turn.name === 'USER_SPEAKING';
-      }
-    }
-    return false;
-  };
+  if (state.name === 'IDLE') {
+    return (
+      <ConversationIdleView
+        onPress={() => {
+          const controller = new ConversationController({
+            audioPlaybackContext,
+          });
+          setState({ name: 'CONVERSATION_ONGOING', controller });
+          void controller.start();
+        }}
+      />
+    );
+  }
 
-  return (
-    <YStack flex={1}>
-      {state.name === 'IDLE' ? (
-        <ConversationIdleView
-          onPress={() => {
-            const controller = new ConversationController({
-              audioPlaybackContext,
-            });
-            setState({ name: 'CONVERSATION_ONGOING', controller });
-            void controller.start();
-          }}
-        />
-      ) : isTalking() ? (
-        <ConversationListeningView
-          onStop={() => {
-            state.controller.changeTurn();
-          }}
-          onCancel={() => {
-            state.controller.terminate();
-            setState({ name: 'IDLE' });
-          }}
-        />
-      ) : (
-        <ConversationPlaybackView
-          onStop={() => {
-            state.controller.changeTurn();
-          }}
-          onCancel={() => {
-            state.controller.terminate();
-            setState({ name: 'IDLE' });
-          }}
-        />
-      )}
-    </YStack>
-  );
+  const { controller } = state;
+
+  if (controller.state.name !== 'RUNNING') {
+    // TODO: Show relevant UI, e.g. loading indicator
+    return null;
+  }
+
+  const { turn } = controller.state;
+
+  if (turn.name === 'USER_SPEAKING') {
+    return (
+      <ConversationListeningView
+        onStop={() => {
+          state.controller.changeTurn();
+        }}
+        onCancel={() => {
+          state.controller.terminate();
+          setState({ name: 'IDLE' });
+        }}
+      />
+    );
+  } else {
+    return (
+      <ConversationPlaybackView
+        captionsRef={turn.playbackController.captionsRef}
+        playbackStartTimeRef={turn.playbackController.playbackStartTimeRef}
+        onStop={() => {
+          state.controller.changeTurn();
+        }}
+        onCancel={() => {
+          state.controller.terminate();
+          setState({ name: 'IDLE' });
+        }}
+      />
+    );
+  }
 }

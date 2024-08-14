@@ -1,32 +1,47 @@
+import type { MutableRefObject } from 'react';
+
 import type {
   AudioPlaybackContext,
   PlaybackInstance,
 } from '../context/AudioPlayback';
 import { StateClass } from '../support/StateClass';
+import type { Caption } from './types';
 
 export class PlaybackController extends StateClass {
   audioStream: AsyncIterable<string>;
+  captionsRef: MutableRefObject<Array<Caption>>;
+  abortController: AbortController;
   audioPlaybackContext: AudioPlaybackContext;
+  playbackStartTimeRef: MutableRefObject<number | null> = {
+    current: null,
+  };
   state:
     | { name: 'IDLE' }
     | { name: 'ERROR'; error: string }
     | { name: 'INITIALIZING'; shouldAbort: boolean }
     | { name: 'PLAYING'; sound: PlaybackInstance };
-  onError: (error: unknown) => void;
-  onDone: () => void;
+  private onDone: () => void;
 
   constructor(init: {
     audioStream: AsyncIterable<string>;
+    captionsRef: MutableRefObject<Array<Caption>>;
+    abortController: AbortController;
     audioPlaybackContext: AudioPlaybackContext;
-    onError: (error: unknown) => void;
     onDone: () => void;
   }) {
     super();
-    const { audioStream, audioPlaybackContext, onError, onDone } = init;
+    const {
+      audioStream,
+      captionsRef,
+      abortController,
+      audioPlaybackContext,
+      onDone,
+    } = init;
     this.audioStream = audioStream;
+    this.captionsRef = captionsRef;
+    this.abortController = abortController;
     this.audioPlaybackContext = audioPlaybackContext;
     this.state = { name: 'IDLE' };
-    this.onError = onError;
     this.onDone = onDone;
   }
 
@@ -37,7 +52,11 @@ export class PlaybackController extends StateClass {
     const sound = await this.audioPlaybackContext.playSound(audioStream, {
       channels: 1,
       sampleRate: 16000,
+      onStart: () => {
+        this.playbackStartTimeRef.current = Date.now();
+      },
       onDone: () => {
+        this.abortController.abort();
         this.onDone();
       },
     });
@@ -50,6 +69,7 @@ export class PlaybackController extends StateClass {
   }
 
   terminate() {
+    this.abortController.abort();
     const state = this.state;
     switch (state.name) {
       case 'INITIALIZING': {

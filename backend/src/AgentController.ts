@@ -2,6 +2,7 @@ import type { ChatCompletionMessageParam as Message } from 'openai/resources';
 
 import { createAgentResponse } from './agent';
 import { AsyncQueue } from './support/AsyncQueue';
+import type { AudioMetaData } from './TextToSpeechController';
 import { TextToSpeechController } from './TextToSpeechController';
 
 type State =
@@ -14,6 +15,7 @@ export class AgentController {
   state: State = { name: 'IDLE' };
   private conversation: Array<Message>;
   outputQueue: AsyncQueue<string>;
+  private onAudioMeta: (meta: AudioMetaData) => void;
   private abortController: AbortController;
   private onError: (error: unknown) => void;
   private onFinalTextResponse: (content: string) => void;
@@ -21,13 +23,16 @@ export class AgentController {
 
   constructor(init: {
     conversation: Array<Message>;
+    onAudioMeta: (meta: AudioMetaData) => void;
     onError: (error: unknown) => void;
     onFinalTextResponse: (content: string) => void;
     onDone: () => void;
   }) {
-    const { conversation, onError, onFinalTextResponse, onDone } = init;
+    const { conversation, onAudioMeta, onError, onFinalTextResponse, onDone } =
+      init;
     this.conversation = conversation;
     this.outputQueue = new AsyncQueue<string>();
+    this.onAudioMeta = onAudioMeta;
     this.abortController = new AbortController();
     this.onError = onError;
     this.onFinalTextResponse = onFinalTextResponse;
@@ -45,6 +50,7 @@ export class AgentController {
       onAudioChunk: (chunk) => {
         void outputQueue.write(chunk);
       },
+      onAudioMeta: this.onAudioMeta,
       onError: (error) => {
         if (this.state.name === 'RUNNING') {
           this.state = { name: 'ERROR', error };

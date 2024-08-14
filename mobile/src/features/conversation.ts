@@ -1,12 +1,15 @@
+import type { MutableRefObject } from 'react';
 import * as Haptics from 'expo-haptics';
 
 import chime from '../../assets/chime-2.wav';
 import type { AudioPlaybackContext } from '../context/AudioPlayback';
 import { createSound } from '../support/createSound';
+import { parseMessage } from '../support/parseMessage';
 import { Socket } from '../support/socket';
 import { StateClass } from '../support/StateClass';
 import { ListeningController } from './ListeningController';
 import { PlaybackController } from './PlaybackController';
+import type { Caption } from './types';
 
 const { NotificationFeedbackType } = Haptics;
 
@@ -26,7 +29,7 @@ type ConversationState =
 
 export class ConversationController extends StateClass {
   state: ConversationState = { name: 'STOPPED' };
-  audioPlaybackContext: AudioPlaybackContext;
+  private audioPlaybackContext: AudioPlaybackContext;
 
   constructor(init: { audioPlaybackContext: AudioPlaybackContext }) {
     super();
@@ -154,13 +157,16 @@ export class ConversationController extends StateClass {
 
   private async startAgentTurn(socket: Socket) {
     const { audioPlaybackContext } = this;
-    const audioStream = getAudioStream(socket);
+    const abortController = new AbortController();
+    const audioStream = getAudioStream(socket, abortController);
+    const captionsRef = getCaptionsRef(socket, abortController);
     // TODO: At this point we're still in the USER_SPEAKING state; should we be in a transition state?
     await this.invoke(() => this.playChime());
     const playbackController = new PlaybackController({
       audioStream,
+      captionsRef,
+      abortController,
       audioPlaybackContext,
-      onError: (error) => this.onError(error),
       onDone: () => {
         void this.startUserTurn(socket);
       },
@@ -174,7 +180,11 @@ export class ConversationController extends StateClass {
   }
 }
 
-function getAudioStream(socket: Socket): AsyncIterable<string> {
+function getAudioStream(
+  socket: Socket,
+  _abortController: AbortController,
+): AsyncIterable<string> {
+  // TODO: Pass abortController to getIterableStream()
   const stream = socket.getIterableStream<string>('AUDIO_CHUNK', (message) => {
     const { value, done } = message;
     return done
@@ -183,4 +193,31 @@ function getAudioStream(socket: Socket): AsyncIterable<string> {
   });
   void socket.send({ type: 'START_PLAYBACK' });
   return stream;
+}
+
+function getCaptionsRef(socket: Socket, abortController: AbortController) {
+  const captionsRef: MutableRefObject<Array<Caption>> = { current: [] };
+  const ws = socket.getWebSocket('captions');
+  ws.addEventListener(
+    'message',
+    (event) => {
+      const message = parseMessage(String(event.data));
+      if (message.type === 'AUDIO_CAPTION') {
+        const captions = toArray(message.captions);
+        for (const maybeCaption of captions) {
+          const caption = Object(maybeCaption);
+          const text = String(caption.text);
+          const startTime = Number(caption.startTime);
+          const endTime = Number(caption.endTime);
+          captionsRef.current.push({ text, startTime, endTime });
+        }
+      }
+    },
+    { signal: abortController.signal },
+  );
+  return captionsRef;
+}
+
+function toArray(input: unknown): Array<unknown> {
+  return Array.isArray(input) ? input : [];
 }
