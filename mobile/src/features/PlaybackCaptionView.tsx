@@ -1,23 +1,15 @@
 import type { MutableRefObject } from 'react';
 import { useEffect, useState } from 'react';
-import { Paragraph, YStack } from 'tamagui';
+import { Paragraph } from 'tamagui';
 
 import type { Caption } from './types';
-
-type DisplaySet = {
-  prev: Caption | null;
-  current: Caption | null;
-};
 
 export function PlaybackCaptionView(props: {
   captionsRef: MutableRefObject<Array<Caption>>;
   playbackStartTimeRef: MutableRefObject<number | null>;
 }) {
   const { captionsRef, playbackStartTimeRef } = props;
-  const [toDisplay, setToDisplay] = useState<DisplaySet>({
-    prev: null,
-    current: null,
-  });
+  const [currentCaption, setCurrentCaption] = useState<Caption | null>(null);
 
   useEffect(() => {
     const mountedAt = Date.now();
@@ -27,18 +19,27 @@ export function PlaybackCaptionView(props: {
 
       const now = Date.now();
       const captions = captionsRef.current;
-      setToDisplay((currentDisplaySet) => {
-        const currentCaption = currentDisplaySet.current;
+      const isRecent = (time: number, threshold: number) => {
+        return Math.abs(now - time) < threshold;
+      };
+      setCurrentCaption((currentCaption) => {
         if (currentCaption && now < offset(currentCaption.endTime)) {
-          // Current display set is still valid
-          return currentDisplaySet;
+          // Current caption is still valid
+          return currentCaption;
         }
-
-        const i = findCurrentCaptionIndex(captions, playbackStartTime);
-        return {
-          prev: captions[i - 1] ?? null,
-          current: captions[i] ?? null,
-        };
+        for (const caption of captions) {
+          if (
+            offset(caption.startTime) <= now &&
+            offset(caption.endTime) >= now
+          ) {
+            return caption;
+          }
+        }
+        // Use the final caption for a brief while after the end
+        if (currentCaption && isRecent(offset(currentCaption.endTime), 400)) {
+          return currentCaption;
+        }
+        return null;
       });
     }, 30);
     return () => {
@@ -46,37 +47,5 @@ export function PlaybackCaptionView(props: {
     };
   }, [captionsRef, playbackStartTimeRef]);
 
-  return (
-    <YStack gap={8}>
-      <Paragraph
-        fontSize="$8"
-        textAlign="center"
-        numberOfLines={1}
-        opacity={0.5}
-      >
-        {toDisplay.prev?.text ?? ''}
-      </Paragraph>
-      <Paragraph fontSize="$8" textAlign="center" numberOfLines={1}>
-        {toDisplay.current?.text ?? ''}
-      </Paragraph>
-    </YStack>
-  );
-}
-
-function findCurrentCaptionIndex(
-  captions: Array<Caption>,
-  playbackStartTime: number,
-) {
-  const now = Date.now();
-  const offset = (time: number) => time + playbackStartTime;
-  let mostRecentCaptionIndex: number | null = null;
-  for (const [i, caption] of captions.entries()) {
-    if (offset(caption.endTime) < now) {
-      mostRecentCaptionIndex = i;
-    }
-    if (now >= offset(caption.startTime) && now <= offset(caption.endTime)) {
-      return i;
-    }
-  }
-  return mostRecentCaptionIndex ?? -1;
+  return <Paragraph>{currentCaption?.text ?? ''}</Paragraph>;
 }
