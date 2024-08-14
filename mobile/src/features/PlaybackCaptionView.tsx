@@ -19,14 +19,12 @@ export function PlaybackCaptionView(props: {
 
       const now = Date.now();
       const captions = captionsRef.current;
-      const isRecent = (time: number, threshold: number) => {
-        return Math.abs(now - time) < threshold;
-      };
       setCurrentCaption((currentCaption) => {
         if (currentCaption && now < offset(currentCaption.endTime)) {
           // Current caption is still valid
           return currentCaption;
         }
+        let mostRecentCaption: Caption | null = null;
         for (const caption of captions) {
           if (
             offset(caption.startTime) <= now &&
@@ -34,12 +32,11 @@ export function PlaybackCaptionView(props: {
           ) {
             return caption;
           }
+          if (offset(caption.endTime) < now) {
+            mostRecentCaption = caption;
+          }
         }
-        // Use the final caption for a brief while after the end
-        if (currentCaption && isRecent(offset(currentCaption.endTime), 400)) {
-          return currentCaption;
-        }
-        return null;
+        return mostRecentCaption;
       });
     }, 30);
     return () => {
@@ -47,5 +44,9 @@ export function PlaybackCaptionView(props: {
     };
   }, [captionsRef, playbackStartTimeRef]);
 
-  return <Paragraph>{currentCaption?.text ?? ''}</Paragraph>;
+  return (
+    <Paragraph fontSize="$8" textAlign="center">
+      {currentCaption?.text ?? ''}
+    </Paragraph>
+  );
 }
