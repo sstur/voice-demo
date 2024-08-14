@@ -22,8 +22,6 @@ type ConversationState =
         | { name: 'USER_SPEAKING'; listeningController: ListeningController }
         | { name: 'AGENT_SPEAKING'; playbackController: PlaybackController };
     }
-  | { name: 'CLOSING' }
-  | { name: 'CLOSED' }
   | { name: 'ERROR'; error: unknown };
 
 export class ConversationController extends StateClass {
@@ -92,19 +90,23 @@ export class ConversationController extends StateClass {
     await this.startUserTurn(socket);
   }
 
-  // TODO: Remove this?
-  // stopListening() {
-  //   const { state } = this;
-  //   if (state.name !== 'RUNNING') {
-  //     return;
-  //   }
-  //   const { turn } = state;
-  //   if (turn.name !== 'USER_SPEAKING') {
-  //     return;
-  //   }
-  //   const { listeningController } = turn;
-  //   listeningController.stop();
-  // }
+  terminate() {
+    const { state } = this;
+    // TODO: If state.name === INITIALIZING need to abort
+    if (state.name !== 'RUNNING') {
+      return;
+    }
+    const { turn, socket } = state;
+    if (turn.name === 'USER_SPEAKING') {
+      const { listeningController } = turn;
+      listeningController.terminate();
+    } else {
+      const { playbackController } = turn;
+      playbackController.terminate();
+    }
+    void socket.close();
+    this.state = { name: 'STOPPED' };
+  }
 
   private onError(error: unknown) {
     this.state = { name: 'ERROR', error };

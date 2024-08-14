@@ -49,17 +49,18 @@ export class ListeningController extends StateClass {
     // Next we're doing two things, telling the server to start and starting the local microphone.
     // TODO: Do these two things in parallel, aborting the other if one fails.
     void this.socket.send({ type: 'START_UPLOAD_STREAM' });
+    this.abortController = new AbortController();
     // { type: 'START_UPLOAD_STREAM_RESULT', success: true } | { type: 'START_UPLOAD_STREAM_RESULT', success: false, error: string }
     const message = await this.socket.waitForMessage(
       'START_UPLOAD_STREAM_RESULT',
+      { signal: this.abortController.signal },
     );
     if (!message.success) {
       this.onError(message.error);
       return;
     }
-    // TODO: abort when we transition out of state LISTENING?
     this.abortController = new AbortController();
-    void this.socket
+    this.socket
       .waitForMessage('TRANSCRIPTION_COMPLETE', {
         timeout: 0,
         signal: this.abortController.signal,
@@ -67,6 +68,15 @@ export class ListeningController extends StateClass {
       .then((message) => {
         const transcription = String(message.transcription);
         this.onDone(transcription);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof Error) {
+          if (error.message === 'Aborted') {
+            return;
+          }
+        }
+        // eslint-disable-next-line no-console
+        console.log('Error while waiting for TRANSCRIPTION_COMPLETE', error);
       });
     const result = await safeInvoke(() => startRecording());
     if (!result.ok) {
@@ -80,6 +90,11 @@ export class ListeningController extends StateClass {
       // This means either the recording errored or a websocket issue
       this.onError(error);
     });
+  }
+
+  terminate() {
+    this.state = { name: 'STOPPED' };
+    this.cleanup();
   }
 
   private async sendStream(readableStream: AsyncGenerator<string, undefined>) {
