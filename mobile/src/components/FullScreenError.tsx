@@ -1,6 +1,5 @@
 import { SafeAreaView } from 'react-native';
-
-import { Button, Paragraph, YStack } from './core';
+import { Button, Paragraph, YStack } from 'tamagui';
 
 type Props = {
   error: unknown;

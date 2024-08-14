@@ -2,16 +2,9 @@ import type { MutableRefObject } from 'react';
 import { useEffect, useReducer, useState } from 'react';
 import { Play, Square, X } from '@tamagui/lucide-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Button, Image, Paragraph, styled, XStack, YStack } from 'tamagui';
 
 import imageCircles from '../../assets/circles.png';
-import {
-  Button,
-  Image,
-  Paragraph,
-  styled,
-  XStack,
-  YStack,
-} from '../components/core';
 import { useAudioPlayback } from '../context/AudioPlayback';
 import { ConversationController } from './conversation';
 import { PlaybackCaptionView } from './PlaybackCaptionView';

@@ -1,8 +1,8 @@
 import { Linking, Platform } from 'react-native';
 import { Audio } from 'expo-av';
 import { Stack } from 'expo-router';
+import { Button, Paragraph, YStack } from 'tamagui';
 
-import { Button, Paragraph, YStack } from '../components/core';
 import { ConversationalChat } from '../features/ConversationalChat';
 
 function PageContent() {
