@@ -39,7 +39,7 @@ export class ListeningController extends StateClass {
   }
 
   private cleanup() {
-    // Stop listening for the TRANSCRIPTION_COMPLETE message from server
+    // Stop listening for the START_UPLOAD_STREAM_RESULT or TRANSCRIPTION_COMPLETE message
     this.abortController.abort();
     void stopRecording();
   }
@@ -90,6 +90,11 @@ export class ListeningController extends StateClass {
       // This means either the recording errored or a websocket issue
       this.onError(error);
     });
+  }
+
+  stop() {
+    // This will cause the audio stream to end, sending AUDIO_DONE to the server
+    void stopRecording();
   }
 
   terminate() {

@@ -90,6 +90,22 @@ export class ConversationController extends StateClass {
     await this.startUserTurn(socket);
   }
 
+  changeTurn() {
+    const { state } = this;
+    if (state.name !== 'RUNNING') {
+      return;
+    }
+    const { turn } = state;
+    if (turn.name === 'USER_SPEAKING') {
+      const { listeningController } = turn;
+      listeningController.stop();
+    } else {
+      const { playbackController } = turn;
+      playbackController.terminate();
+      void this.startUserTurn(state.socket);
+    }
+  }
+
   terminate() {
     const { state } = this;
     // TODO: If state.name === INITIALIZING need to abort

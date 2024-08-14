@@ -122,28 +122,20 @@ export function ConversationalChat() {
       ) : isTalking() ? (
         <ConversationListeningView
           onStop={() => {
-            const { controller } = state;
-            // TODO: Go to playback mode
-            controller.terminate();
-            setState({ name: 'IDLE' });
+            state.controller.changeTurn();
           }}
           onCancel={() => {
-            const { controller } = state;
-            controller.terminate();
+            state.controller.terminate();
             setState({ name: 'IDLE' });
           }}
         />
       ) : (
         <ConversationPlaybackView
           onStop={() => {
-            const { controller } = state;
-            // TODO: Go back to listening mode
-            controller.terminate();
-            setState({ name: 'IDLE' });
+            state.controller.changeTurn();
           }}
           onCancel={() => {
-            const { controller } = state;
-            controller.terminate();
+            state.controller.terminate();
             setState({ name: 'IDLE' });
           }}
         />
