@@ -1,12 +1,84 @@
 import { useEffect, useReducer, useState } from 'react';
+import { Play, Square, X } from '@tamagui/lucide-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button, Text, VStack } from '../components/core';
+import imageCircles from '../../assets/circles.png';
+import {
+  Button,
+  Image,
+  Paragraph,
+  styled,
+  XStack,
+  YStack,
+} from '../components/core';
 import { useAudioPlayback } from '../context/AudioPlayback';
 import { ConversationController } from './conversation';
 
 type State =
   | { name: 'IDLE' }
   | { name: 'CONVERSATION_ONGOING'; controller: ConversationController };
+
+const IconButton = styled(Button, {
+  borderRadius: 32,
+  padding: 0,
+  size: '$8',
+  width: 64,
+  height: 64,
+});
+
+function ConversationIdleView(props: { onPress: () => void }) {
+  return (
+    <YStack flex={1}>
+      <YStack flex={1} />
+      <YStack width="100%" aspectRatio={1} padding={20}>
+        <Image width="100%" height="100%" opacity={0.6} source={imageCircles} />
+      </YStack>
+      <YStack flex={1} justifyContent="center" alignItems="center">
+        <Button icon={Play} onPress={props.onPress}>
+          {t('Start Conversation')}
+        </Button>
+      </YStack>
+    </YStack>
+  );
+}
+
+function ConversationListeningView(props: {
+  onStop: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <SafeAreaView style={{ flex: 1 }}>
+      <YStack flex={1} justifyContent="center" alignItems="center">
+        <Paragraph>{t('Listening...')}</Paragraph>
+      </YStack>
+      <YStack>
+        <XStack justifyContent="center" alignItems="center" gap={20} py={20}>
+          <IconButton icon={Square} onPress={props.onStop} />
+          <IconButton icon={X} onPress={props.onCancel} />
+        </XStack>
+      </YStack>
+    </SafeAreaView>
+  );
+}
+
+function ConversationPlaybackView(props: {
+  onStop: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <SafeAreaView style={{ flex: 1 }}>
+      <YStack flex={1} justifyContent="center" alignItems="center">
+        <Paragraph>{t('Speaking...')}</Paragraph>
+      </YStack>
+      <YStack>
+        <XStack justifyContent="center" alignItems="center" gap={20} py={20}>
+          <IconButton icon={Square} onPress={props.onStop} />
+          <IconButton icon={X} onPress={props.onCancel} />
+        </XStack>
+      </YStack>
+    </SafeAreaView>
+  );
+}
 
 export function ConversationalChat() {
   const audioPlaybackContext = useAudioPlayback();
@@ -36,40 +108,46 @@ export function ConversationalChat() {
   };
 
   return (
-    <VStack flex={1} justifyContent="center" alignItems="center">
+    <YStack flex={1}>
       {state.name === 'IDLE' ? (
-        <>
-          <Text>{t('Ready')}</Text>
-          <Button
-            onPress={() => {
-              const controller = new ConversationController({
-                audioPlaybackContext,
-              });
-              setState({ name: 'CONVERSATION_ONGOING', controller });
-              void controller.start();
-            }}
-          >
-            {t('Start')}
-          </Button>
-        </>
+        <ConversationIdleView
+          onPress={() => {
+            const controller = new ConversationController({
+              audioPlaybackContext,
+            });
+            setState({ name: 'CONVERSATION_ONGOING', controller });
+            void controller.start();
+          }}
+        />
+      ) : isTalking() ? (
+        <ConversationListeningView
+          onStop={() => {
+            const { controller } = state;
+            // TODO: Go to playback mode
+            controller.terminate();
+            setState({ name: 'IDLE' });
+          }}
+          onCancel={() => {
+            const { controller } = state;
+            controller.terminate();
+            setState({ name: 'IDLE' });
+          }}
+        />
       ) : (
-        <>
-          <Text>{t('Running...')}</Text>
-          {isTalking() ? (
-            <Button
-              onPress={() => {
-                const controller = new ConversationController({
-                  audioPlaybackContext,
-                });
-                setState({ name: 'CONVERSATION_ONGOING', controller });
-                void controller.start();
-              }}
-            >
-              {t('Done Talking')}
-            </Button>
-          ) : null}
-        </>
+        <ConversationPlaybackView
+          onStop={() => {
+            const { controller } = state;
+            // TODO: Go back to listening mode
+            controller.terminate();
+            setState({ name: 'IDLE' });
+          }}
+          onCancel={() => {
+            const { controller } = state;
+            controller.terminate();
+            setState({ name: 'IDLE' });
+          }}
+        />
       )}
-    </VStack>
+    </YStack>
   );
 }

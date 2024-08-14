@@ -1,6 +1,6 @@
 import { SafeAreaView } from 'react-native';
 
-import { Button, Text, VStack } from './core';
+import { Button, Paragraph, YStack } from './core';
 
 type Props = {
   error: unknown;
@@ -11,12 +11,12 @@ export function FullScreenError(props: Props) {
   const { error, onRetryPress } = props;
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      <VStack p={20} gap={20}>
-        <Text>{String(error)}</Text>
+      <YStack p={20} gap={20}>
+        <Paragraph>{String(error)}</Paragraph>
         {onRetryPress ? (
           <Button onPress={onRetryPress}>{t('Retry')}</Button>
         ) : null}
-      </VStack>
+      </YStack>
     </SafeAreaView>
   );
 }
