@@ -136,13 +136,11 @@ export class TextToSpeechController {
           case 'timestamps': {
             const captions: Array<Caption> = [];
             const { words, start, end } = message.word_timestamps;
-            for (const [i, text] of words.entries()) {
-              const startTime = toMs(start[i] ?? 0);
-              const endTime = toMs(end[i] ?? 0);
-              captions.push({ text, startTime, endTime });
-            }
+            const text = words.join(' ');
+            const startTime = toMs(start[0] ?? 0);
+            const endTime = toMs(end.at(-1) ?? 0);
+            captions.push({ text, startTime, endTime });
             this.onAudioMeta({ captions });
-            // logger.log('>> Playing:', JSON.stringify(words.join(' ')));
             break;
           }
           // A done message will look like: { "status_code": 200, "done": true, "type": "done", "context_id": "..." }
