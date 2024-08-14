@@ -55,10 +55,15 @@ export class Socket {
   getIterableStream<T>(
     type: string,
     toResult: (message: Message) => IteratorResult<T, undefined>,
+    abortController: AbortController,
   ): AsyncIterableIterator<T> {
     const asyncQueue = new AsyncQueue<T>();
+    abortController.signal.addEventListener('abort', () => {
+      cleanupEventListeners();
+      asyncQueue.close();
+    });
     const ws = this.getWebSocket('getIterable');
-    // TODO: use AbortController to remove listeners?
+    // TODO: Better way to remove listeners? But don't use the abortController that was passed in.
     const onClose = (_event: CloseEvent) => {
       cleanupEventListeners();
       asyncQueue.close();

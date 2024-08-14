@@ -182,15 +182,18 @@ export class ConversationController extends StateClass {
 
 function getAudioStream(
   socket: Socket,
-  _abortController: AbortController,
+  abortController: AbortController,
 ): AsyncIterable<string> {
-  // TODO: Pass abortController to getIterableStream()
-  const stream = socket.getIterableStream<string>('AUDIO_CHUNK', (message) => {
-    const { value, done } = message;
-    return done
-      ? { value: undefined, done: true }
-      : { value: String(value), done: false };
-  });
+  const stream = socket.getIterableStream<string>(
+    'AUDIO_CHUNK',
+    (message) => {
+      const { value, done } = message;
+      return done
+        ? { value: undefined, done: true }
+        : { value: String(value), done: false };
+    },
+    abortController,
+  );
   void socket.send({ type: 'START_PLAYBACK' });
   return stream;
 }
