@@ -15,11 +15,14 @@ export function ConversationPlaybackView(props: {
   onCancel: () => void;
 }) {
   const { captionsRef, playbackStartTimeRef, onStop, onCancel } = props;
-  const [playbackStarted, setPlaybackStarted] = useState(false);
+  const [playbackStartedAt, setPlaybackStartedAt] = useState<number | null>(
+    null,
+  );
   useEffect(() => {
     const intervalId = setInterval(() => {
-      if (playbackStartTimeRef.current !== null) {
-        setPlaybackStarted(true);
+      const playbackStartTime = playbackStartTimeRef.current;
+      if (playbackStartTime !== null) {
+        setPlaybackStartedAt(playbackStartTime);
         clearInterval(intervalId);
       }
     }, 67);
@@ -31,24 +34,26 @@ export function ConversationPlaybackView(props: {
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <YStack flex={1} justifyContent="center" gap={20}>
-        <PlaybackCaptionView
-          captionsRef={captionsRef}
-          playbackStartTimeRef={playbackStartTimeRef}
-        />
-        {playbackStarted ? (
-          <LottieView
-            source={
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-              require('../../assets/animation-voice.json')
-            }
-            style={{
-              width: 400,
-              height: 100,
-              opacity: 0.7,
-            }}
-            autoPlay={true}
-            loop={true}
-          />
+        {playbackStartedAt !== null ? (
+          <>
+            <PlaybackCaptionView
+              captionsRef={captionsRef}
+              playbackStartedAt={playbackStartedAt}
+            />
+            <LottieView
+              source={
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+                require('../../assets/animation-voice.json')
+              }
+              style={{
+                width: 400,
+                height: 100,
+                opacity: 0.7,
+              }}
+              autoPlay={true}
+              loop={true}
+            />
+          </>
         ) : (
           <Spinner />
         )}

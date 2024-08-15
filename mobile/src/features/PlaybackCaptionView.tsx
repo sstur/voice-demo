@@ -6,16 +6,14 @@ import type { Caption } from './types';
 
 export function PlaybackCaptionView(props: {
   captionsRef: MutableRefObject<Array<Caption>>;
-  playbackStartTimeRef: MutableRefObject<number | null>;
+  playbackStartedAt: number;
 }) {
-  const { captionsRef, playbackStartTimeRef } = props;
+  const { captionsRef, playbackStartedAt } = props;
   const [currentCaption, setCurrentCaption] = useState<Caption | null>(null);
 
   useEffect(() => {
-    const mountedAt = Date.now();
     const intervalId = setInterval(() => {
-      const playbackStartTime = playbackStartTimeRef.current ?? mountedAt;
-      const offset = (time: number) => time + playbackStartTime;
+      const offset = (time: number) => time + playbackStartedAt;
 
       const now = Date.now();
       const captions = captionsRef.current;
@@ -38,11 +36,11 @@ export function PlaybackCaptionView(props: {
         }
         return mostRecentCaption;
       });
-    }, 30);
+    }, 33);
     return () => {
       clearInterval(intervalId);
     };
-  }, [captionsRef, playbackStartTimeRef]);
+  }, [captionsRef, playbackStartedAt]);
 
   return (
     <Paragraph fontSize="$8" textAlign="center">
