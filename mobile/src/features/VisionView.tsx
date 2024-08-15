@@ -9,6 +9,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Spinner, Text, View, XStack, YStack } from 'tamagui';
 
 import { sleep } from '../support/sleep';
+import { resize } from './resize';
+import type { ImageResult } from './types';
 
 type CameraState =
   | { name: 'IDLE' }
@@ -20,11 +22,11 @@ type RootState =
   | { name: 'ERROR'; message: string };
 
 export function VisionView(props: {
-  onPhoto: (photo: CameraCapturedPicture) => void;
+  onPhoto: (photo: ImageResult) => void;
   style?: StyleProp<ViewStyle> | undefined;
 }) {
   const { onPhoto, style } = props;
-  const [facing, setFacing] = useState<CameraType>('back');
+  const [facing, setFacing] = useState<CameraType>('front');
   const [permission, requestPermission] = useCameraPermissions();
   const safeAreaInsets = useSafeAreaInsets();
   const [state, setState] = useState<RootState>({ name: 'INITIALIZING' });
@@ -105,47 +107,18 @@ function Camera(props: {
   style?: StyleProp<ViewStyle> | undefined;
 }) {
   const { facing, onReady, ...otherProps } = props;
-  const [pictureSize, setPictureSize] = useState<string | undefined>();
   const cameraRef = useRef<CameraView>(null);
   return (
     <CameraView
       ref={cameraRef}
       facing={facing}
       mode="picture"
-      pictureSize={pictureSize}
       animateShutter={false}
       mute={true}
       onCameraReady={() => {
         const camera = cameraRef.current;
         if (camera) {
-          camera
-            .getAvailablePictureSizesAsync()
-            .then((pictureSizes) => {
-              const size = getSize(new Set(pictureSizes), [
-                // '1280x720',
-                '640x480',
-                'Medium',
-              ]);
-              if (size === null) {
-                // eslint-disable-next-line no-console
-                console.warn(
-                  'Error: No suitable size found in list of available sizes:',
-                  pictureSizes,
-                );
-                return;
-              }
-              setPictureSize(size);
-            })
-            .catch((error: unknown) => {
-              // eslint-disable-next-line no-console
-              console.warn(
-                'Error: Unable to get available picture sizes;',
-                error,
-              );
-            })
-            .finally(() => {
-              onReady(camera);
-            });
+          onReady(camera);
         }
       }}
       onMountError={(event) => {
@@ -170,7 +143,7 @@ function IconButton(props: { onPress: () => void; children: ReactNode }) {
 
 async function takePictures(
   camera: CameraView,
-  onPhoto: (photo: CameraCapturedPicture) => void,
+  onPhoto: (photo: ImageResult) => void,
   abortController: AbortController,
 ) {
   const minWaitTime = 1200;
@@ -193,8 +166,8 @@ async function takePictures(
   }
 }
 
-function takePicture(camera: CameraView): Promise<CameraCapturedPicture> {
-  return new Promise((resolve, reject) => {
+async function takePicture(camera: CameraView) {
+  const result = await new Promise<CameraCapturedPicture>((resolve, reject) => {
     camera
       .takePictureAsync({
         imageType: 'jpg',
@@ -206,13 +179,5 @@ function takePicture(camera: CameraView): Promise<CameraCapturedPicture> {
         reject(e instanceof Error ? e : new Error(String(e)));
       });
   });
-}
-
-function getSize(availableSizes: Set<string>, desiredSizes: Array<string>) {
-  for (const size of desiredSizes) {
-    if (availableSizes.has(size)) {
-      return size;
-    }
-  }
-  return null;
+  return await resize(result, { maxSize: 512, quality: 0.7 });
 }

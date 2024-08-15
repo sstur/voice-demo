@@ -2,13 +2,13 @@ import type { MutableRefObject } from 'react';
 import { useEffect, useReducer, useState } from 'react';
 import { Play, Square, X } from '@tamagui/lucide-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Image, Paragraph, styled, XStack, YStack } from 'tamagui';
+import { Button, Image, styled, XStack, YStack } from 'tamagui';
 
 import imageCircles from '../../assets/circles.png';
 import { useAudioPlayback } from '../context/AudioPlayback';
 import { ConversationController } from './conversation';
 import { PlaybackCaptionView } from './PlaybackCaptionView';
-import type { Caption } from './types';
+import type { Caption, ImageResult } from './types';
 import { VisionView } from './VisionView';
 
 type State =
@@ -42,24 +42,16 @@ function ConversationIdleView(props: { onPress: () => void }) {
 function ConversationListeningView(props: {
   onStop: () => void;
   onCancel: () => void;
+  onPhoto?: (photo: ImageResult) => void;
 }) {
-  const { onStop, onCancel } = props;
+  const { onStop, onCancel, onPhoto } = props;
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <YStack flex={1} justifyContent="center" alignItems="center">
         {/* <Paragraph>{t('Listening...')}</Paragraph> */}
-        <VisionView
-          style={{ width: 180, height: 320 }}
-          onPhoto={(photo) => {
-            const { uri, width, height, base64 } = photo;
-            console.log('Took photo:', {
-              uri,
-              width,
-              height,
-              base64: base64?.length,
-            });
-          }}
-        />
+        {onPhoto ? (
+          <VisionView style={{ width: 180, height: 320 }} onPhoto={onPhoto} />
+        ) : null}
       </YStack>
       <YStack>
         <XStack justifyContent="center" alignItems="center" gap={20} py={20}>
@@ -127,23 +119,33 @@ export function ConversationalChat() {
   }
 
   const { controller } = state;
+  const controllerState = controller.state;
 
-  if (controller.state.name !== 'RUNNING') {
+  if (controllerState.name !== 'RUNNING') {
     // TODO: Show relevant UI, e.g. loading indicator
     return null;
   }
 
-  const { turn } = controller.state;
+  const { turn } = controllerState;
 
   if (turn.name === 'USER_SPEAKING') {
     return (
       <ConversationListeningView
         onStop={() => {
-          state.controller.changeTurn();
+          controller.changeTurn();
         }}
         onCancel={() => {
-          state.controller.terminate();
+          controller.terminate();
           setState({ name: 'IDLE' });
+        }}
+        onPhoto={(photo) => {
+          const { width, height, base64 } = photo;
+          void controllerState.socket.send({
+            type: 'PHOTO',
+            width,
+            height,
+            dataUri: 'data:image/jpeg;base64,' + base64,
+          });
         }}
       />
     );
@@ -153,10 +155,10 @@ export function ConversationalChat() {
         captionsRef={turn.playbackController.captionsRef}
         playbackStartTimeRef={turn.playbackController.playbackStartTimeRef}
         onStop={() => {
-          state.controller.changeTurn();
+          controller.changeTurn();
         }}
         onCancel={() => {
-          state.controller.terminate();
+          controller.terminate();
           setState({ name: 'IDLE' });
         }}
       />
