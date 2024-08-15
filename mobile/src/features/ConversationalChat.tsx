@@ -1,10 +1,11 @@
 import type { MutableRefObject } from 'react';
 import { useEffect, useReducer, useState } from 'react';
-import { Play, Square, X } from '@tamagui/lucide-icons';
+import { MoreVertical, Play, Square, X } from '@tamagui/lucide-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Image, styled, XStack, YStack } from 'tamagui';
 
 import imageCircles from '../../assets/circles.png';
+import { DropdownMenu } from '../components/DropdownMenu';
 import { useAudioPlayback } from '../context/AudioPlayback';
 import { ConversationController } from './conversation';
 import { PlaybackCaptionView } from './PlaybackCaptionView';
@@ -13,7 +14,15 @@ import { VisionView } from './VisionView';
 
 type State =
   | { name: 'IDLE' }
-  | { name: 'CONVERSATION_ONGOING'; controller: ConversationController };
+  | {
+      name: 'CONVERSATION_ONGOING';
+      controller: ConversationController;
+      visionEnabled: boolean;
+    };
+
+type ConversationOptions = {
+  visionEnabled: boolean;
+};
 
 const IconButton = styled(Button, {
   borderRadius: 32,
@@ -23,33 +32,62 @@ const IconButton = styled(Button, {
   height: 64,
 });
 
-function ConversationIdleView(props: { onPress: () => void }) {
+function ConversationIdleView(props: {
+  onStartConversationPress: (options: ConversationOptions) => void;
+}) {
+  const { onStartConversationPress } = props;
   return (
-    <YStack flex={1}>
-      <YStack flex={1} />
+    <SafeAreaView style={{ flex: 1 }}>
+      <YStack flex={1}>
+        <XStack justifyContent="flex-end">
+          <DropdownMenu
+            trigger={
+              <Button
+                chromeless
+                p={0}
+                w={42}
+                h={42}
+                borderRadius={21}
+                icon={<MoreVertical size="$1.5" />}
+              />
+            }
+            items={[
+              {
+                label: t('Vision'),
+                onClick: () =>
+                  onStartConversationPress({ visionEnabled: true }),
+              },
+            ]}
+          />
+        </XStack>
+      </YStack>
       <YStack width="100%" aspectRatio={1} padding={20}>
         <Image width="100%" height="100%" opacity={0.6} source={imageCircles} />
       </YStack>
       <YStack flex={1} justifyContent="center" alignItems="center">
-        <Button icon={Play} onPress={props.onPress}>
+        <Button
+          icon={Play}
+          onPress={() => onStartConversationPress({ visionEnabled: false })}
+        >
           {t('Start Conversation')}
         </Button>
       </YStack>
-    </YStack>
+    </SafeAreaView>
   );
 }
 
 function ConversationListeningView(props: {
+  visionEnabled: boolean;
   onStop: () => void;
   onCancel: () => void;
-  onPhoto?: (photo: ImageResult) => void;
+  onPhoto: (photo: ImageResult) => void;
 }) {
-  const { onStop, onCancel, onPhoto } = props;
+  const { visionEnabled, onStop, onCancel, onPhoto } = props;
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <YStack flex={1} justifyContent="center" alignItems="center">
         {/* <Paragraph>{t('Listening...')}</Paragraph> */}
-        {onPhoto ? (
+        {visionEnabled ? (
           <VisionView style={{ width: 180, height: 320 }} onPhoto={onPhoto} />
         ) : null}
       </YStack>
@@ -107,11 +145,11 @@ export function ConversationalChat() {
   if (state.name === 'IDLE') {
     return (
       <ConversationIdleView
-        onPress={() => {
+        onStartConversationPress={({ visionEnabled }) => {
           const controller = new ConversationController({
             audioPlaybackContext,
           });
-          setState({ name: 'CONVERSATION_ONGOING', controller });
+          setState({ name: 'CONVERSATION_ONGOING', controller, visionEnabled });
           void controller.start();
         }}
       />
@@ -131,6 +169,7 @@ export function ConversationalChat() {
   if (turn.name === 'USER_SPEAKING') {
     return (
       <ConversationListeningView
+        visionEnabled={state.visionEnabled}
         onStop={() => {
           controller.changeTurn();
         }}
