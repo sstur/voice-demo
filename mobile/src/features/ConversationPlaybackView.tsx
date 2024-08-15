@@ -1,8 +1,8 @@
-import type { MutableRefObject } from 'react';
+import { useEffect, useState, type MutableRefObject } from 'react';
 import { Square, X } from '@tamagui/lucide-icons';
 import LottieView from 'lottie-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { XStack, YStack } from 'tamagui';
+import { Spinner, XStack, YStack } from 'tamagui';
 
 import { IconButton } from '../components/IconButton';
 import { PlaybackCaptionView } from './PlaybackCaptionView';
@@ -15,6 +15,19 @@ export function ConversationPlaybackView(props: {
   onCancel: () => void;
 }) {
   const { captionsRef, playbackStartTimeRef, onStop, onCancel } = props;
+  const [playbackStarted, setPlaybackStarted] = useState(false);
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      if (playbackStartTimeRef.current !== null) {
+        setPlaybackStarted(true);
+        clearInterval(intervalId);
+      }
+    }, 67);
+    return () => {
+      clearInterval(intervalId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <YStack flex={1} justifyContent="center" gap={20}>
@@ -22,19 +35,23 @@ export function ConversationPlaybackView(props: {
           captionsRef={captionsRef}
           playbackStartTimeRef={playbackStartTimeRef}
         />
-        <LottieView
-          source={
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-            require('../../assets/animation-voice.json')
-          }
-          style={{
-            width: 400,
-            height: 100,
-            opacity: 0.7,
-          }}
-          autoPlay={true}
-          loop={true}
-        />
+        {playbackStarted ? (
+          <LottieView
+            source={
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+              require('../../assets/animation-voice.json')
+            }
+            style={{
+              width: 400,
+              height: 100,
+              opacity: 0.7,
+            }}
+            autoPlay={true}
+            loop={true}
+          />
+        ) : (
+          <Spinner />
+        )}
       </YStack>
       <YStack>
         <XStack justifyContent="space-around" alignItems="center" py={20}>
