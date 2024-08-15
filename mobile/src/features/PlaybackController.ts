@@ -57,7 +57,10 @@ export class PlaybackController extends StateClass {
       },
       onDone: () => {
         this.abortController.abort();
-        this.onDone();
+        // When sound.stop() is called below, that will land us here this but we don't want to call onDone in that case.
+        if (this.state.name === 'PLAYING') {
+          this.onDone();
+        }
       },
     });
     if (this.state.shouldAbort) {

@@ -105,8 +105,6 @@ export class ConversationController extends StateClass {
     } else {
       const { playbackController } = turn;
       playbackController.terminate();
-      // Somehow the playbackController.terminate() invokes its onDone which
-      // invokes startUserTurn() so this next line is a duplicate.
       void this.startUserTurn(state.socket);
     }
   }
