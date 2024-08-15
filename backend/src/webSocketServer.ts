@@ -172,6 +172,24 @@ wss.on('connection', (socket) => {
         }
         break;
       }
+      case 'ABORT_PLAYBACK': {
+        const currentState = state.current;
+        switch (currentState.name) {
+          case 'FINALIZING_TRANSCRIPTION': {
+            state.current = {
+              name: 'FINALIZING_TRANSCRIPTION',
+              whenDone: 'ABORT',
+            };
+            break;
+          }
+          case 'AGENT_WORKING': {
+            const { agentController } = currentState;
+            agentController.terminate();
+            break;
+          }
+        }
+        break;
+      }
       default: {
         logger.warn('Unrecognized message from client:', payload);
       }

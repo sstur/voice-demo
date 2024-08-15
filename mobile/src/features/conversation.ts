@@ -158,6 +158,11 @@ export class ConversationController extends StateClass {
   private async startAgentTurn(socket: Socket) {
     const { audioPlaybackContext } = this;
     const abortController = new AbortController();
+    abortController.signal.addEventListener('abort', () => {
+      if (socket.state.name === 'OPEN') {
+        void socket.send({ type: 'ABORT_PLAYBACK' });
+      }
+    });
     const audioStream = getAudioStream(socket, abortController);
     const captionsRef = getCaptionsRef(socket, abortController);
     // TODO: At this point we're still in the USER_SPEAKING state; should we be in a transition state?
