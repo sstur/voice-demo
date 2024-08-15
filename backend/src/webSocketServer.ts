@@ -99,8 +99,8 @@ wss.on('connection', (socket) => {
                       .replace(/\W/g, '')
                       .match(/oldfashioned(accent|voice|tone)/i)
                   ? '41534e16-2966-4c6b-9670-111411def906'
-                  : text.match(/southern (accent|voice|tone)/i)
-                    ? '40104aff-a015-4da1-9912-af950fbec99e'
+                  : text.match(/my own (accent|voice|tone)/i)
+                    ? '923256ef-9129-4f3c-b772-63719780dce7'
                     : undefined,
               onAudioMeta: ({ captions }) => {
                 send({ type: 'AUDIO_CAPTION', captions });
