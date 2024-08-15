@@ -1,11 +1,7 @@
-/**
- * TODO: Consider replacing createListenerManager with something like promise.race
- */
 import { AsyncQueue } from './AsyncQueue';
 import { API_BASE_URL } from './constants';
 import { sleep } from './sleep';
-import { createListenerManager } from './websockets/createListenerManager';
-import { toWebSocketUrl } from './websockets/toWebSocketUrl';
+import { toWebSocketUrl } from './toWebSocketUrl';
 
 const MAX_WRITE_BUFFER = 64 * 1024;
 
@@ -120,22 +116,15 @@ function openWebSocket(ws: WebSocket) {
       reject(new Error('Error opening WebSocket: Already closed'));
       return;
     }
-    const { addListener, removeAllListeners } = createListenerManager(ws);
-    addListener('error', () => {
-      removeAllListeners();
-      reject(new Error('Error opening WebSocket'));
-    });
-    addListener('close', () => {
-      removeAllListeners();
-      reject(
-        new Error(
-          'Error opening WebSocket: Server closed connection unexpectedly',
+    onFirstEvent(ws, {
+      error: () => reject(new Error('Error opening WebSocket')),
+      close: () =>
+        reject(
+          new Error(
+            'Error opening WebSocket: Server closed connection unexpectedly',
+          ),
         ),
-      );
-    });
-    addListener('open', () => {
-      removeAllListeners();
-      resolve();
+      open: () => resolve(),
     });
   });
 }
@@ -194,14 +183,9 @@ function closeWebSocket(ws: WebSocket, code?: number, reason?: string) {
       resolve();
       return;
     }
-    const { addListener, removeAllListeners } = createListenerManager(ws);
-    addListener('error', () => {
-      removeAllListeners();
-      reject(new Error('Error closing WebSocket'));
-    });
-    addListener('close', () => {
-      removeAllListeners();
-      resolve();
+    onFirstEvent(ws, {
+      error: () => reject(new Error('Error closing WebSocket')),
+      close: () => resolve(),
     });
     ws.close(code, reason);
   });
@@ -217,5 +201,28 @@ function safeParse(input: string): Record<string, unknown> {
     return isObject(value) ? value : { value };
   } catch {
     return {};
+  }
+}
+
+/**
+ * Add a set of event listeners, but remove all when the first one is emitted.
+ */
+function onFirstEvent(
+  ws: WebSocket,
+  object: {
+    [K in keyof WebSocketEventMap]?: (event: WebSocketEventMap[K]) => void;
+  },
+) {
+  const abortController = new AbortController();
+  for (const [eventName, listener] of Object.entries(object)) {
+    ws.addEventListener(
+      eventName,
+      (event) => {
+        abortController.abort();
+        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+        listener(event as never);
+      },
+      { signal: abortController.signal },
+    );
   }
 }
