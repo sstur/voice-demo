@@ -105,6 +105,8 @@ export class ConversationController extends StateClass {
     } else {
       const { playbackController } = turn;
       playbackController.terminate();
+      // Somehow the playbackController.terminate() invokes its onDone which
+      // invokes startUserTurn() so this next line is a duplicate.
       void this.startUserTurn(state.socket);
     }
   }
@@ -132,6 +134,13 @@ export class ConversationController extends StateClass {
   }
 
   private async startUserTurn(socket: Socket) {
+    if (
+      this.state.name === 'RUNNING' &&
+      this.state.turn.name === 'USER_SPEAKING'
+    ) {
+      // Can't start user turn if already started.
+      return;
+    }
     // Ideally we should invoke this after the microphone has starts, but that
     // doesn't seem to work. It seems to fail silently.
     void Haptics.notificationAsync(NotificationFeedbackType.Success);

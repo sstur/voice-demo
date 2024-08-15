@@ -32,6 +32,10 @@ export class ListeningController extends StateClass {
       onError(error);
     });
     this.onDone = once((transcription) => {
+      // For some reason this is getting called after error above.
+      if (this.state.name === 'ERROR') {
+        return;
+      }
       this.state = { name: 'STOPPED' };
       this.cleanup();
       onDone(transcription);
