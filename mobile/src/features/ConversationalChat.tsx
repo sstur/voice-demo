@@ -1,6 +1,7 @@
 import type { MutableRefObject } from 'react';
 import { useEffect, useReducer, useState } from 'react';
 import { MoreVertical, Play, Square, X } from '@tamagui/lucide-icons';
+import LottieView from 'lottie-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Image, styled, XStack, YStack } from 'tamagui';
 
@@ -89,7 +90,20 @@ function ConversationListeningView(props: {
         {/* <Paragraph>{t('Listening...')}</Paragraph> */}
         {visionEnabled ? (
           <VisionView style={{ width: 180, height: 320 }} onPhoto={onPhoto} />
-        ) : null}
+        ) : (
+          <LottieView
+            source={
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+              require('../../assets/animation-microphone.json')
+            }
+            style={{
+              width: 400,
+              height: 400,
+            }}
+            autoPlay={true}
+            loop={true}
+          />
+        )}
       </YStack>
       <YStack>
         <XStack justifyContent="center" alignItems="center" gap={20} py={20}>
