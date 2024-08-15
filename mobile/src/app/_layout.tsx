@@ -1,9 +1,7 @@
-import { SplashScreen, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import { useTheme } from 'tamagui';
 
 import { AppProvider } from '../providers/AppProvider';
-
-void SplashScreen.preventAutoHideAsync();
 
 function RootContent() {
   const theme = useTheme();
@@ -22,7 +20,7 @@ function RootContent() {
 
 export default function Layout() {
   return (
-    <AppProvider onInitialized={() => SplashScreen.hideAsync()}>
+    <AppProvider>
       <RootContent />
     </AppProvider>
   );
