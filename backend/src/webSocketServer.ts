@@ -93,9 +93,15 @@ wss.on('connection', (socket) => {
             const agentController = new AgentController({
               conversation,
               // TODO: Remove this hack.
-              voiceId: text.match(/british (voice|tone)/i)
+              voiceId: text.match(/british (accent|voice|tone)/i)
                 ? '79a125e8-cd45-4c13-8a67-188112f4dd22'
-                : undefined,
+                : text
+                      .replace(/\W/g, '')
+                      .match(/oldfashioned(accent|voice|tone)/i)
+                  ? '41534e16-2966-4c6b-9670-111411def906'
+                  : text.match(/southern (accent|voice|tone)/i)
+                    ? '40104aff-a015-4da1-9912-af950fbec99e'
+                    : undefined,
               onAudioMeta: ({ captions }) => {
                 send({ type: 'AUDIO_CAPTION', captions });
               },
