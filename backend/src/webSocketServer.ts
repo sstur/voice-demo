@@ -89,7 +89,7 @@ wss.on('connection', (socket) => {
             // Alternatively if Deepgram identifies a period of silence it will
             // invoke this code path.
             send({ type: 'TRANSCRIPTION_COMPLETE', transcription: text });
-            logger.log('Transcription complete:', JSON.stringify(text));
+            logger.log('USER:', JSON.stringify(text));
             const agentController = new AgentController({
               conversation,
               // TODO: Remove this hack.
