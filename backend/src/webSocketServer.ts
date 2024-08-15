@@ -190,6 +190,15 @@ wss.on('connection', (socket) => {
         }
         break;
       }
+      case 'PARTIAL_PLAYBACK': {
+        const contentPlayed = String(payload.contentPlayed);
+        const lastMessage = conversation.at(-1);
+        if (lastMessage?.role === 'assistant' && contentPlayed) {
+          conversation.pop();
+          conversation.push({ role: 'assistant', content: contentPlayed });
+        }
+        break;
+      }
       default: {
         logger.warn('Unrecognized message from client:', payload);
       }

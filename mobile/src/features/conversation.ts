@@ -106,7 +106,7 @@ export class ConversationController extends StateClass {
     } else {
       const { playbackController } = turn;
       playbackController.terminate();
-      this.onPlaybackInterrupted(playbackController);
+      this.onPlaybackInterrupted(playbackController, state.socket);
       void this.startUserTurn(state.socket);
     }
   }
@@ -120,7 +120,10 @@ export class ConversationController extends StateClass {
     });
   }
 
-  private onPlaybackInterrupted(playbackController: PlaybackController) {
+  private onPlaybackInterrupted(
+    playbackController: PlaybackController,
+    socket: Socket,
+  ) {
     const { captionsRef, playbackStartTimeRef } = playbackController;
     const playbackStartTime = playbackStartTimeRef.current;
     const numMsPlayed =
@@ -131,6 +134,9 @@ export class ConversationController extends StateClass {
       role: 'ASSISTANT',
       content: contentPlayed,
     });
+    if (contentPlayed) {
+      void socket.send({ type: 'PARTIAL_PLAYBACK', contentPlayed });
+    }
   }
 
   terminate() {
@@ -146,7 +152,7 @@ export class ConversationController extends StateClass {
     } else {
       const { playbackController } = turn;
       playbackController.terminate();
-      this.onPlaybackInterrupted(playbackController);
+      this.onPlaybackInterrupted(playbackController, state.socket);
     }
     void socket.close();
     this.state = { name: 'STOPPED' };
