@@ -59,31 +59,28 @@ export class Socket {
       asyncQueue.close();
     });
     const ws = this.getWebSocket('getIterable');
-    // TODO: Better way to remove listeners? But don't use the abortController that was passed in.
-    const onClose = (_event: CloseEvent) => {
-      cleanupEventListeners();
-      asyncQueue.close();
-    };
-    ws.addEventListener('close', onClose);
-    const onMessage = (event: MessageEvent) => {
-      const data: unknown = event.data;
-      const message: Message = typeof data === 'string' ? safeParse(data) : {};
-      if (message.type === type) {
-        const { value, done } = toResult(message);
-        if (value !== undefined) {
-          void asyncQueue.write(value);
+
+    const cleanupEventListeners = addListeners(ws, {
+      close: () => {
+        cleanupEventListeners();
+        asyncQueue.close();
+      },
+      message: (event: MessageEvent) => {
+        const data: unknown = event.data;
+        const message: Message =
+          typeof data === 'string' ? safeParse(data) : {};
+        if (message.type === type) {
+          const { value, done } = toResult(message);
+          if (value !== undefined) {
+            void asyncQueue.write(value);
+          }
+          if (done) {
+            cleanupEventListeners();
+            asyncQueue.close();
+          }
         }
-        if (done) {
-          cleanupEventListeners();
-          asyncQueue.close();
-        }
-      }
-    };
-    ws.addEventListener('message', onMessage);
-    const cleanupEventListeners = () => {
-      ws.removeEventListener('message', onMessage);
-      ws.removeEventListener('close', onClose);
-    };
+      },
+    });
     return asyncQueue;
   }
 
@@ -116,15 +113,23 @@ function openWebSocket(ws: WebSocket) {
       reject(new Error('Error opening WebSocket: Already closed'));
       return;
     }
-    onFirstEvent(ws, {
-      error: () => reject(new Error('Error opening WebSocket')),
-      close: () =>
+    const cleanupEventListeners = addListeners(ws, {
+      error: () => {
+        cleanupEventListeners();
+        reject(new Error('Error opening WebSocket'));
+      },
+      close: () => {
+        cleanupEventListeners();
         reject(
           new Error(
             'Error opening WebSocket: Server closed connection unexpectedly',
           ),
-        ),
-      open: () => resolve(),
+        );
+      },
+      open: () => {
+        cleanupEventListeners();
+        resolve();
+      },
     });
   });
 }
@@ -183,9 +188,15 @@ function closeWebSocket(ws: WebSocket, code?: number, reason?: string) {
       resolve();
       return;
     }
-    onFirstEvent(ws, {
-      error: () => reject(new Error('Error closing WebSocket')),
-      close: () => resolve(),
+    const cleanupEventListeners = addListeners(ws, {
+      error: () => {
+        cleanupEventListeners();
+        reject(new Error('Error closing WebSocket'));
+      },
+      close: () => {
+        cleanupEventListeners();
+        resolve();
+      },
     });
     ws.close(code, reason);
   });
@@ -205,24 +216,22 @@ function safeParse(input: string): Record<string, unknown> {
 }
 
 /**
- * Add a set of event listeners, but remove all when the first one is emitted.
+ * Add a set of event listeners, returning a cleanup function to remove them all.
  */
-function onFirstEvent(
+function addListeners(
   ws: WebSocket,
-  object: {
+  listeners: {
     [K in keyof WebSocketEventMap]?: (event: WebSocketEventMap[K]) => void;
   },
 ) {
   const abortController = new AbortController();
-  for (const [eventName, listener] of Object.entries(object)) {
+  for (const [eventName, listener] of Object.entries(listeners)) {
     ws.addEventListener(
       eventName,
-      (event) => {
-        abortController.abort();
-        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-        listener(event as never);
-      },
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+      listener as never,
       { signal: abortController.signal },
     );
   }
+  return () => abortController.abort();
 }
