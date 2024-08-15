@@ -48,7 +48,6 @@ export class PlaybackController extends StateClass {
   async start() {
     this.state = { name: 'INITIALIZING', shouldAbort: false };
     const audioStream = this.audioStream;
-    // TODO: Change state; enable cancel button in UI
     const sound = await this.audioPlaybackContext.playSound(audioStream, {
       channels: 1,
       sampleRate: 16000,
