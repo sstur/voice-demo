@@ -92,6 +92,10 @@ wss.on('connection', (socket) => {
             logger.log('Transcription complete:', JSON.stringify(text));
             const agentController = new AgentController({
               conversation,
+              // TODO: Remove this hack.
+              voiceId: text.match(/british (voice|tone)/i)
+                ? '79a125e8-cd45-4c13-8a67-188112f4dd22'
+                : undefined,
               onAudioMeta: ({ captions }) => {
                 send({ type: 'AUDIO_CAPTION', captions });
               },

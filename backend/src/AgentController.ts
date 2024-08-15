@@ -20,6 +20,7 @@ export class AgentController {
   private onError: (error: unknown) => void;
   private onFinalTextResponse: (content: string) => void;
   private onDone: () => void;
+  private voiceId: string | undefined;
 
   constructor(init: {
     conversation: Array<Message>;
@@ -27,9 +28,16 @@ export class AgentController {
     onError: (error: unknown) => void;
     onFinalTextResponse: (content: string) => void;
     onDone: () => void;
+    voiceId: string | undefined;
   }) {
-    const { conversation, onAudioMeta, onError, onFinalTextResponse, onDone } =
-      init;
+    const {
+      conversation,
+      onAudioMeta,
+      onError,
+      onFinalTextResponse,
+      onDone,
+      voiceId,
+    } = init;
     this.conversation = conversation;
     this.outputQueue = new AsyncQueue<string>();
     this.onAudioMeta = onAudioMeta;
@@ -37,6 +45,7 @@ export class AgentController {
     this.onError = onError;
     this.onFinalTextResponse = onFinalTextResponse;
     this.onDone = onDone;
+    this.voiceId = voiceId;
   }
 
   async start() {
@@ -46,6 +55,7 @@ export class AgentController {
     });
     const textToSpeechController = new TextToSpeechController({
       inputStream: responseStream,
+      voiceId: this.voiceId,
       onFinalTextResponse: this.onFinalTextResponse,
       onAudioChunk: (chunk) => {
         void outputQueue.write(chunk);

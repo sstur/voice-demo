@@ -10,6 +10,7 @@ import { createId } from './support/createId';
 import { eventLogger } from './support/EventLogger';
 import { logger } from './support/Logger';
 import { parseMessage } from './support/parseMessage';
+import { voiceId } from './voice';
 
 // This should be a multiple of 4 since the samples are float32.
 // If too small this will cause stutter in playback; I'm not totally sure
@@ -50,6 +51,7 @@ export class TextToSpeechController {
   private onError: (error: unknown) => void;
   private onFinalTextResponse: (content: string) => void;
   private onDone: () => void;
+  private voiceId: string | undefined;
 
   constructor(init: {
     inputStream: AsyncIterableIterator<string>;
@@ -58,6 +60,7 @@ export class TextToSpeechController {
     onError: (error: unknown) => void;
     onFinalTextResponse: (content: string) => void;
     onDone: () => void;
+    voiceId: string | undefined;
   }) {
     const {
       inputStream,
@@ -66,6 +69,7 @@ export class TextToSpeechController {
       onError,
       onFinalTextResponse,
       onDone,
+      voiceId,
     } = init;
     this.inputStream = inputStream;
     this.contextId = createId();
@@ -74,6 +78,7 @@ export class TextToSpeechController {
     this.onError = onError;
     this.onFinalTextResponse = onFinalTextResponse;
     this.onDone = onDone;
+    this.voiceId = voiceId;
   }
 
   async start() {
@@ -177,20 +182,7 @@ export class TextToSpeechController {
         model_id: 'sonic-english',
         voice: {
           mode: 'id',
-          // id: '5345cf08-6f37-424d-a5d9-8ae1101b9377', // Maria
-          // id: '11af83e2-23eb-452f-956e-7fee218ccb5c', // Midwestern Woman
-          // id: 'c45bc5ec-dc68-4feb-8829-6e6b2748095d', // Movie man
-          // id: '79f8b5fb-2cc8-479a-80df-29f7a7cf1a3e', // Nonfiction Man
-          // id: '15a9cd88-84b0-4a8b-95f2-5d583b54c72e', // Reading Lady
-          // id: 'f9836c6e-a0bd-460e-9d3c-f7299fa60f94', // Southern Woman
-          // id: '573e3144-a684-4e72-ac2b-9b2063a50b53', // Teacher Lady
-          // id: '41534e16-2966-4c6b-9670-111411def906', // 1920's Radio man
-          // id: 'b7d50908-b17c-442d-ad8d-810c63997ed9', // California Girl
-          // id: 'c2ac25f9-ecc4-4f56-9095-651354df60c0', // Commercial Lady
-          // id: '5c42302c-194b-4d0c-ba1a-8cb485c84ab9', // Female Nurse
-          // id: '156fb8d2-335b-4950-9cb3-a2d33befec77', // Helpful Woman
-          // id: '18bbf178-4921-45cf-b9e1-81f05a4588f2', // Pi clone
-          id: '11af83e2-23eb-452f-956e-7fee218ccb5c',
+          id: this.voiceId ?? voiceId,
         },
         transcript: text,
         context_id: contextId,
