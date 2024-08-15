@@ -5,9 +5,10 @@ import { ConversationController } from './conversation';
 import { ConversationIdleView } from './ConversationIdleView';
 import { ConversationListeningView } from './ConversationListeningView';
 import { ConversationPlaybackView } from './ConversationPlaybackView';
+import type { ConversationMessage } from './types';
 
 type State =
-  | { name: 'IDLE' }
+  | { name: 'IDLE'; lastConversation?: Array<ConversationMessage> }
   | {
       name: 'CONVERSATION_ONGOING';
       controller: ConversationController;
@@ -33,6 +34,10 @@ export function ConversationHome() {
   if (state.name === 'IDLE') {
     return (
       <ConversationIdleView
+        lastConversation={state.lastConversation}
+        onClearConversationPress={() => {
+          setState({ name: 'IDLE' });
+        }}
         onStartConversationPress={({ visionEnabled }) => {
           const controller = new ConversationController({
             audioPlaybackContext,
@@ -63,7 +68,7 @@ export function ConversationHome() {
         }}
         onCancel={() => {
           controller.terminate();
-          setState({ name: 'IDLE' });
+          setState({ name: 'IDLE', lastConversation: controller.conversation });
         }}
         onPhoto={(photo) => {
           const { width, height, base64 } = photo;
@@ -86,7 +91,7 @@ export function ConversationHome() {
         }}
         onCancel={() => {
           controller.terminate();
-          setState({ name: 'IDLE' });
+          setState({ name: 'IDLE', lastConversation: controller.conversation });
         }}
       />
     );

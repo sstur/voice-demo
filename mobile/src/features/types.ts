@@ -5,6 +5,11 @@ export type ImageResult = {
   base64: string;
 };
 
+export type ConversationMessage = {
+  role: 'USER' | 'ASSISTANT';
+  content: string;
+};
+
 export type Caption = {
   text: string;
   startTime: number;

@@ -1,21 +1,28 @@
 import { MoreVertical, Play } from '@tamagui/lucide-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Image, XStack, YStack } from 'tamagui';
+import { Button, Image, Paragraph, ScrollView, XStack, YStack } from 'tamagui';
 
 import imageCircles from '../../assets/circles.png';
 import { DropdownMenu } from '../components/DropdownMenu';
+import type { ConversationMessage } from './types';
 
 type ConversationOptions = {
   visionEnabled: boolean;
 };
 
 export function ConversationIdleView(props: {
+  lastConversation: Array<ConversationMessage> | undefined;
+  onClearConversationPress: () => void;
   onStartConversationPress: (options: ConversationOptions) => void;
 }) {
-  const { onStartConversationPress } = props;
+  const {
+    lastConversation,
+    onClearConversationPress,
+    onStartConversationPress,
+  } = props;
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      <YStack flex={1}>
+      <YStack>
         <XStack justifyContent="flex-end">
           <DropdownMenu
             trigger={
@@ -34,14 +41,35 @@ export function ConversationIdleView(props: {
                 onClick: () =>
                   onStartConversationPress({ visionEnabled: true }),
               },
+              {
+                label: t('Clear Conversation'),
+                onClick: () => onClearConversationPress(),
+              },
             ]}
           />
         </XStack>
       </YStack>
-      <YStack width="100%" aspectRatio={1} padding={20}>
-        <Image width="100%" height="100%" opacity={0.6} source={imageCircles} />
+      <YStack flex={1} justifyContent="center">
+        {lastConversation && lastConversation.length ? (
+          <ScrollView flex={1}>
+            <YStack gap={20} py={20}>
+              {lastConversation.map((message, i) => (
+                <MessageView key={i} message={message} />
+              ))}
+            </YStack>
+          </ScrollView>
+        ) : (
+          <YStack width="100%" aspectRatio={1} padding={20}>
+            <Image
+              width="100%"
+              height="100%"
+              opacity={0.6}
+              source={imageCircles}
+            />
+          </YStack>
+        )}
       </YStack>
-      <YStack flex={1} justifyContent="center" alignItems="center">
+      <YStack alignItems="center" py={30}>
         <Button
           icon={Play}
           onPress={() => onStartConversationPress({ visionEnabled: false })}
@@ -50,5 +78,25 @@ export function ConversationIdleView(props: {
         </Button>
       </YStack>
     </SafeAreaView>
+  );
+}
+
+function MessageView(props: { message: ConversationMessage }) {
+  const { role, content } = props.message;
+  return (
+    <XStack
+      px={20}
+      justifyContent={role === 'ASSISTANT' ? 'flex-start' : 'flex-end'}
+    >
+      <YStack
+        maxWidth="80%"
+        py="$3"
+        px="$4"
+        borderRadius={10}
+        backgroundColor={role === 'ASSISTANT' ? '$gray5Dark' : '$green8Dark'}
+      >
+        <Paragraph fontSize="$5">{content}</Paragraph>
+      </YStack>
+    </XStack>
   );
 }

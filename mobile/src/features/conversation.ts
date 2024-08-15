@@ -9,7 +9,7 @@ import { Socket } from '../support/socket';
 import { StateClass } from '../support/StateClass';
 import { ListeningController } from './ListeningController';
 import { PlaybackController } from './PlaybackController';
-import type { Caption } from './types';
+import type { Caption, ConversationMessage } from './types';
 
 const { NotificationFeedbackType } = Haptics;
 
@@ -29,6 +29,7 @@ type ConversationState =
 
 export class ConversationController extends StateClass {
   state: ConversationState = { name: 'STOPPED' };
+  conversation: Array<ConversationMessage> = [];
   private audioPlaybackContext: AudioPlaybackContext;
 
   constructor(init: { audioPlaybackContext: AudioPlaybackContext }) {
@@ -105,8 +106,31 @@ export class ConversationController extends StateClass {
     } else {
       const { playbackController } = turn;
       playbackController.terminate();
+      this.onPlaybackInterrupted(playbackController);
       void this.startUserTurn(state.socket);
     }
+  }
+
+  private onPlaybackComplete(playbackController: PlaybackController) {
+    const { captionsRef } = playbackController;
+    const contentPlayed = captionsRef.current.map(({ text }) => text).join(' ');
+    this.conversation.push({
+      role: 'ASSISTANT',
+      content: contentPlayed,
+    });
+  }
+
+  private onPlaybackInterrupted(playbackController: PlaybackController) {
+    const { captionsRef, playbackStartTimeRef } = playbackController;
+    const playbackStartTime = playbackStartTimeRef.current;
+    const numMsPlayed =
+      playbackStartTime === null ? 0 : Math.abs(Date.now() - playbackStartTime);
+    const contentPlayed = getContentPlayed(captionsRef.current, numMsPlayed);
+    // TODO: Send a message to the server to update its conversation with this partial content
+    this.conversation.push({
+      role: 'ASSISTANT',
+      content: contentPlayed,
+    });
   }
 
   terminate() {
@@ -122,6 +146,7 @@ export class ConversationController extends StateClass {
     } else {
       const { playbackController } = turn;
       playbackController.terminate();
+      this.onPlaybackInterrupted(playbackController);
     }
     void socket.close();
     this.state = { name: 'STOPPED' };
@@ -145,7 +170,11 @@ export class ConversationController extends StateClass {
     const listeningController = new ListeningController({
       socket,
       onError: (error) => this.onError(error),
-      onDone: () => {
+      onDone: (transcription) => {
+        this.conversation.push({
+          role: 'USER',
+          content: transcription,
+        });
         void this.startAgentTurn(socket);
       },
     });
@@ -180,6 +209,7 @@ export class ConversationController extends StateClass {
       abortController,
       audioPlaybackContext,
       onDone: () => {
+        this.onPlaybackComplete(playbackController);
         void this.startUserTurn(socket);
       },
     });
@@ -235,4 +265,16 @@ function getCaptionsRef(socket: Socket, abortController: AbortController) {
 
 function toArray(input: unknown): Array<unknown> {
   return Array.isArray(input) ? input : [];
+}
+
+function getContentPlayed(captions: Array<Caption>, numMsPlayed: number) {
+  const fragments: Array<string> = [];
+  for (const caption of captions) {
+    if (caption.startTime < numMsPlayed) {
+      fragments.push(caption.text);
+    } else {
+      break;
+    }
+  }
+  return fragments.join(' ');
 }
