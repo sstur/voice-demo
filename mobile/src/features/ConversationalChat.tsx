@@ -3,10 +3,11 @@ import { useEffect, useReducer, useState } from 'react';
 import { MoreVertical, Play, Square, X } from '@tamagui/lucide-icons';
 import LottieView from 'lottie-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Image, styled, XStack, YStack } from 'tamagui';
+import { Button, Image, XStack, YStack } from 'tamagui';
 
 import imageCircles from '../../assets/circles.png';
 import { DropdownMenu } from '../components/DropdownMenu';
+import { IconButton } from '../components/IconButton';
 import { useAudioPlayback } from '../context/AudioPlayback';
 import { ConversationController } from './conversation';
 import { PlaybackCaptionView } from './PlaybackCaptionView';
@@ -24,14 +25,6 @@ type State =
 type ConversationOptions = {
   visionEnabled: boolean;
 };
-
-const IconButton = styled(Button, {
-  borderRadius: 32,
-  padding: 0,
-  size: '$8',
-  width: 64,
-  height: 64,
-});
 
 function ConversationIdleView(props: {
   onStartConversationPress: (options: ConversationOptions) => void;
