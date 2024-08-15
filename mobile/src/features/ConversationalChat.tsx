@@ -106,7 +106,7 @@ function ConversationListeningView(props: {
         )}
       </YStack>
       <YStack>
-        <XStack justifyContent="center" alignItems="center" gap={20} py={20}>
+        <XStack justifyContent="space-around" alignItems="center" py={20}>
           <IconButton icon={Square} onPress={onStop} />
           <IconButton icon={X} onPress={onCancel} />
         </XStack>
@@ -144,7 +144,7 @@ function ConversationPlaybackView(props: {
         />
       </YStack>
       <YStack>
-        <XStack justifyContent="center" alignItems="center" gap={20} py={20}>
+        <XStack justifyContent="space-around" alignItems="center" py={20}>
           <IconButton icon={Square} onPress={onStop} />
           <IconButton icon={X} onPress={onCancel} />
         </XStack>
