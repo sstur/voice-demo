@@ -93,7 +93,7 @@ function MessageView(props: { message: ConversationMessage }) {
         py="$3"
         px="$4"
         borderRadius={10}
-        backgroundColor={role === 'ASSISTANT' ? '$gray5Dark' : '$green8Dark'}
+        backgroundColor={role === 'ASSISTANT' ? '$gray5Dark' : '#1a6679'}
       >
         <Paragraph fontSize="$5">{content}</Paragraph>
       </YStack>
