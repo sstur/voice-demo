@@ -3,7 +3,7 @@ import { Audio } from 'expo-av';
 import { Stack } from 'expo-router';
 import { Button, Paragraph, YStack } from 'tamagui';
 
-import { ConversationalChat } from '../features/ConversationalChat';
+import { ConversationHome } from '../features/ConversationHome';
 
 function PageContent() {
   const [permission, requestPermission] = Audio.usePermissions();
@@ -33,7 +33,7 @@ function PageContent() {
     );
   }
 
-  return <ConversationalChat />;
+  return <ConversationHome />;
 }
 
 export default function Page() {
