@@ -124,10 +124,23 @@ function ConversationPlaybackView(props: {
   const { captionsRef, playbackStartTimeRef, onStop, onCancel } = props;
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      <YStack flex={1} justifyContent="center">
+      <YStack flex={1} justifyContent="center" gap={20}>
         <PlaybackCaptionView
           captionsRef={captionsRef}
           playbackStartTimeRef={playbackStartTimeRef}
+        />
+        <LottieView
+          source={
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            require('../../assets/animation-voice.json')
+          }
+          style={{
+            width: 400,
+            height: 100,
+            opacity: 0.7,
+          }}
+          autoPlay={true}
+          loop={true}
         />
       </YStack>
       <YStack>
