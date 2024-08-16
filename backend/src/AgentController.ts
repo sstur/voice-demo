@@ -28,7 +28,7 @@ export class AgentController {
     onError: (error: unknown) => void;
     onFinalTextResponse: (content: string) => void;
     onDone: () => void;
-    voiceId: string | undefined;
+    voiceId?: string;
   }) {
     const {
       conversation,
