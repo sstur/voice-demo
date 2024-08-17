@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
-import { Linking, Pressable } from 'react-native';
+import { Pressable } from 'react-native';
 import { RefreshCw } from '@tamagui/lucide-icons';
 import type { CameraCapturedPicture, CameraType } from 'expo-camera';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { CameraView } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, Spinner, Text, View, XStack, YStack } from 'tamagui';
+import { View, XStack } from 'tamagui';
 
 import { sleep } from '../support/sleep';
 import { resize } from './resize';
@@ -27,7 +27,6 @@ export function VisionView(props: {
 }) {
   const { onPhoto, style } = props;
   const [facing, setFacing] = useState<CameraType>('front');
-  const [permission, requestPermission] = useCameraPermissions();
   const safeAreaInsets = useSafeAreaInsets();
   const [state, setState] = useState<RootState>({ name: 'INITIALIZING' });
 
@@ -35,29 +34,6 @@ export function VisionView(props: {
   useEffect(() => {
     return () => abortController.abort();
   }, [abortController]);
-
-  if (!permission) {
-    return (
-      <YStack flex={1} jc="center" ai="center">
-        <Spinner />
-      </YStack>
-    );
-  }
-
-  if (!permission.granted) {
-    return (
-      <YStack flex={1} jc="center" ai="center">
-        <Text textAlign="center">{t('Camera requires permission.')}</Text>
-        {permission.canAskAgain ? (
-          <Button onPress={requestPermission}>{t('Show Camera')}</Button>
-        ) : (
-          <Button onPress={() => Linking.openSettings()}>
-            {t('Settings')}
-          </Button>
-        )}
-      </YStack>
-    );
-  }
 
   const toggleCameraFacing = () => {
     setFacing((current) => (current === 'back' ? 'front' : 'back'));

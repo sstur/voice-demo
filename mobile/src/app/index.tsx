@@ -1,40 +1,7 @@
-import { Linking, Platform } from 'react-native';
-import { Audio } from 'expo-av';
 import { Stack } from 'expo-router';
-import { Button, Paragraph, YStack } from 'tamagui';
 
+import { MicrophonePermission } from '../components/MicrophonePermission';
 import { ConversationHome } from '../features/ConversationHome';
-
-function PageContent() {
-  const [permission, requestPermission] = Audio.usePermissions();
-
-  if (!permission) {
-    return null;
-  }
-
-  if (!permission.granted) {
-    return (
-      <YStack flex={1} justifyContent="center" alignItems="center">
-        <Paragraph>
-          {t('We need microphone permission to enable conversational chat.')}
-        </Paragraph>
-        <Button
-          onPress={() => {
-            if (permission.canAskAgain) {
-              void requestPermission();
-            } else {
-              openSettings();
-            }
-          }}
-        >
-          {t('Continue')}
-        </Button>
-      </YStack>
-    );
-  }
-
-  return <ConversationHome />;
-}
 
 export default function Page() {
   return (
@@ -45,15 +12,13 @@ export default function Page() {
           headerShown: false,
         }}
       />
-      <PageContent />
+      <MicrophonePermission
+        message={t(
+          'Microphone permission is needed to enable conversational chat.',
+        )}
+      >
+        <ConversationHome />
+      </MicrophonePermission>
     </>
   );
-}
-
-function openSettings() {
-  if (Platform.OS === 'ios') {
-    void Linking.openURL('app-settings:');
-  } else {
-    // TODO: Android
-  }
 }

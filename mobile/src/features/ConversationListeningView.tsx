@@ -4,15 +4,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { YStack } from 'tamagui';
 
 import { ActionButton } from '../components/ActionButton';
+import { CameraPermission } from '../components/CameraPermission';
 import type { ImageResult } from './types';
 import { VisionView } from './VisionView';
 
-export function ConversationListeningView(props: {
+type Props = {
   visionEnabled: boolean;
   onStop: () => void;
   onCancel: () => void;
   onPhoto: (photo: ImageResult) => void;
-}) {
+};
+
+function ConversationListeningViewContent(props: Props) {
   const { visionEnabled, onStop, onCancel, onPhoto } = props;
   return (
     <SafeAreaView style={{ flex: 1 }}>
@@ -44,5 +47,18 @@ export function ConversationListeningView(props: {
         </ActionButton>
       </YStack>
     </SafeAreaView>
+  );
+}
+
+export function ConversationListeningView(props: Props) {
+  const { visionEnabled } = props;
+  return visionEnabled ? (
+    <CameraPermission
+      message={t('Camera permission is needed to enable vision mode.')}
+    >
+      <ConversationListeningViewContent {...props} />
+    </CameraPermission>
+  ) : (
+    <ConversationListeningViewContent {...props} />
   );
 }

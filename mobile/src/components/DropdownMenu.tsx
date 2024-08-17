@@ -42,7 +42,9 @@ export function DropdownMenu(props: {
           {items.map((item, i) => {
             return (
               <Popover.Close key={i} asChild>
-                <Paragraph onPress={item.onClick}>{item.label}</Paragraph>
+                <Paragraph size="$5" onPress={item.onClick}>
+                  {item.label}
+                </Paragraph>
               </Popover.Close>
             );
           })}
