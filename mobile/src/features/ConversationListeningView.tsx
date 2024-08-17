@@ -1,9 +1,9 @@
-import { Square, X } from '@tamagui/lucide-icons';
+import { ArrowLeftRight, PhoneOff } from '@tamagui/lucide-icons';
 import LottieView from 'lottie-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { XStack, YStack } from 'tamagui';
+import { YStack } from 'tamagui';
 
-import { IconButton } from '../components/IconButton';
+import { ActionButton } from '../components/ActionButton';
 import type { ImageResult } from './types';
 import { VisionView } from './VisionView';
 
@@ -35,11 +35,13 @@ export function ConversationListeningView(props: {
           />
         )}
       </YStack>
-      <YStack>
-        <XStack justifyContent="space-around" alignItems="center" py={20}>
-          <IconButton icon={Square} onPress={onStop} />
-          <IconButton icon={X} onPress={onCancel} />
-        </XStack>
+      <YStack alignItems="center" gap={20} py={20}>
+        <ActionButton icon={ArrowLeftRight} onPress={onStop}>
+          {t('Done Talking')}
+        </ActionButton>
+        <ActionButton icon={PhoneOff} onPress={onCancel} color="$red10Dark">
+          {t('End Conversation')}
+        </ActionButton>
       </YStack>
     </SafeAreaView>
   );

@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Image, Paragraph, ScrollView, XStack, YStack } from 'tamagui';
 
 import imageCircles from '../../assets/circles.png';
+import { ActionButton } from '../components/ActionButton';
 import { DropdownMenu } from '../components/DropdownMenu';
 import type { ConversationMessage } from './types';
 
@@ -70,12 +71,12 @@ export function ConversationIdleView(props: {
         )}
       </YStack>
       <YStack alignItems="center" py={30}>
-        <Button
+        <ActionButton
           icon={Play}
           onPress={() => onStartConversationPress({ visionEnabled: false })}
         >
           {t('Start Conversation')}
-        </Button>
+        </ActionButton>
       </YStack>
     </SafeAreaView>
   );
